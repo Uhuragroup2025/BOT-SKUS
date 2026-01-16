@@ -49,12 +49,12 @@ export default function LoginPage() {
                         </div>
                     </div>
                     <CardTitle className="text-2xl font-bold tracking-tight">Bienvenido a SKU Optimizer</CardTitle>
-                    <CardDescription>
-                        Ingresa para potenciar tus fichas de producto con IA
+                    <CardDescription className="max-w-sm mx-auto">
+                        Genera fichas de producto optimizadas para SEO, buscadores con IA y asistentes como ChatGPT, Gemini y otros motores de descubrimiento.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form id="login-form" onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="email">Correo electrónico</Label>
                             <Input
@@ -64,7 +64,7 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="bg-white/50 dark:bg-gray-950/50"
+                                className="bg-white/50 dark:bg-gray-900/50"
                             />
                         </div>
                         <div className="space-y-2">
@@ -74,7 +74,7 @@ export default function LoginPage() {
                                 type="password"
                                 placeholder="••••••••"
                                 required
-                                className="bg-white/50 dark:bg-gray-950/50"
+                                className="bg-white/50 dark:bg-gray-900/50"
                             />
                         </div>
                         <Button type="submit" className="w-full bg-primary hover:bg-primary/90 transition-colors" disabled={loading}>
@@ -85,7 +85,12 @@ export default function LoginPage() {
                 </CardContent>
                 <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
                     <div>
-                        ¿No tienes cuenta? <span className="text-primary hover:underline cursor-pointer">Regístrate gratis</span>
+                        ¿No tienes cuenta? <span
+                            className="text-primary hover:underline cursor-pointer"
+                            onClick={() => {
+                                document.getElementById('email')?.focus();
+                            }}
+                        >Regístrate gratis</span>
                     </div>
                 </CardFooter>
             </Card>
