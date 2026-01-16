@@ -23,13 +23,13 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-purple-50/30 via-white to-[#7F41DE]/10 dark:from-purple-950/30 dark:via-gray-950 dark:to-purple-900/10 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-purple-50/30 via-white to-[#7F41DE]/10 dark:from-purple-950/30 dark:via-gray-950 dark:to-purple-900/10 p-4 sm:p-6 lg:p-8">
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-purple-500/10 blur-3xl"></div>
                 <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[#7F41DE]/10 blur-3xl"></div>
             </div>
 
-            <Card className="w-full max-w-md relative z-10 border-none shadow-xl bg-white/80 backdrop-blur-md dark:bg-gray-900/80">
+            <Card className="w-full max-w-sm sm:max-w-md relative z-10 border-none shadow-xl bg-white/80 backdrop-blur-md dark:bg-gray-900/80">
                 <CardHeader className="space-y-1 text-center">
                     <div className="flex justify-center mb-6">
                         <div className="relative w-32 h-8">

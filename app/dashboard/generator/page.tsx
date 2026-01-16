@@ -86,9 +86,9 @@ export default function GeneratorPage() {
     };
 
     return (
-        <div className="grid lg:grid-cols-2 gap-8 h-[calc(100vh-8rem)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:h-[calc(100vh-8rem)]">
             {/* LEFT COLUMN: FORM */}
-            <Card className="h-full overflow-y-auto border-none shadow-md">
+            <Card className="h-full lg:overflow-y-auto border-none shadow-md">
                 <CardContent className="p-6 space-y-6">
                     <div className="space-y-2">
                         <h2 className="text-xl font-semibold">Datos del producto</h2>
@@ -176,7 +176,7 @@ export default function GeneratorPage() {
             </Card>
 
             {/* RIGHT COLUMN: RESULT */}
-            <div className="h-full overflow-y-auto space-y-4">
+            <div className="lg:h-full lg:overflow-y-auto space-y-4">
                 {!result ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-xl bg-gray-50/50 dark:bg-gray-900/50 text-muted-foreground">
                         <Sparkles className="w-12 h-12 mb-4 opacity-20" />

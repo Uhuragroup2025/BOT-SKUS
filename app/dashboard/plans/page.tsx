@@ -12,10 +12,10 @@ export default function PlansPage() {
     const currentPlan = plan === 'lite' ? 'emprendedor' : plan;
 
     return (
-        <div className="space-y-8 pb-10">
-            <div className="text-center space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight">Elige el plan perfecto para ti</h1>
-                <p className="text-muted-foreground text-lg">“Empieza gratis. Solo pagas cuando lo necesitas.”</p>
+        <div className="space-y-8 pb-10 px-0 sm:px-4">
+            <div className="text-center space-y-2 max-w-2xl mx-auto">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight px-4 sm:px-0">Elige el plan perfecto para ti</h1>
+                <p className="text-muted-foreground text-base md:text-lg px-6 sm:px-0">“Empieza gratis. Solo pagas cuando lo necesitas.”</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">

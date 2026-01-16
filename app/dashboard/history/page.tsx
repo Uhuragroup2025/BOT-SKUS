@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, MoreHorizontal, Download, Eye, Copy, X } from "lucide-react";
@@ -290,13 +291,14 @@ export default function HistoryPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Historial de Fichas</h1>
-                    <p className="text-muted-foreground">Gestiona y descarga tus contenidos generados previamente.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-center md:text-left">Historial de Fichas</h1>
+                    <p className="text-muted-foreground text-center md:text-left text-sm md:text-base">Gestiona y descarga tus contenidos generados previamente.</p>
                 </div>
                 <Button
                     variant="outline"
+                    className="w-full md:w-auto"
                     onClick={handleExportCSV}
                     disabled={user?.plan === 'free'}
                     title={user?.plan === 'free' ? "Exportar CSV requiere un plan de pago" : ""}
@@ -306,7 +308,8 @@ export default function HistoryPage() {
                 </Button>
             </div>
 
-            <Card>
+            {/* Desktop Table View */}
+            <Card className="hidden md:block">
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader>
@@ -390,6 +393,71 @@ export default function HistoryPage() {
                     </Table>
                 </CardContent>
             </Card>
+
+            {/* Mobile Card View */}
+            <div className="grid grid-cols-1 gap-4 md:hidden pb-20">
+                {generations.length === 0 ? (
+                    <Card className="p-10 text-center text-muted-foreground">
+                        <p className="text-lg font-medium">Aún no has generado fichas</p>
+                        <p className="text-sm">Crea tu primera ficha para verla aquí.</p>
+                    </Card>
+                ) : (
+                    generations.map((item) => {
+                        const content = getNormalizedContent(item.content);
+                        const displayedScore = item.score_ia !== null ? item.score_ia : (content.score || null);
+
+                        return (
+                            <Card key={item.id} className="p-4 space-y-4 shadow-sm border-none bg-white dark:bg-gray-900">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                            <FileText className="h-5 w-5" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <p className="font-bold text-base leading-tight truncate max-w-[180px]">{item.product_name}</p>
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                {new Date(item.created_at).toLocaleDateString()} · {item.settings?.category || 'General'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <MoreHorizontal className="h-5 w-5" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleView(item)}>
+                                                <Eye className="mr-2 h-4 w-4" /> Ver ficha
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => handleDownloadPDF(item)}
+                                                disabled={user?.plan === 'free'}
+                                            >
+                                                <Download className="mr-2 h-4 w-4" /> PDF
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                                <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-3 rounded-xl border border-border/50">
+                                    <div className="space-y-0.5">
+                                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Score IA</p>
+                                        <div className="flex items-center font-bold text-lg">
+                                            <span className={getScoreColor(displayedScore)}>
+                                                {displayedScore || '--'}
+                                            </span>
+                                            <span className="text-muted-foreground font-normal text-xs ml-0.5">/100</span>
+                                        </div>
+                                    </div>
+                                    <Badge variant="default" className={cn("text-[10px] font-bold h-6 px-2", getBadgeVariant(displayedScore))}>
+                                        {displayedScore && displayedScore >= 75 ? 'Optimizado' : 'Revisar'}
+                                    </Badge>
+                                </div>
+                            </Card>
+                        );
+                    })
+                )}
+            </div>
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto font-sans">

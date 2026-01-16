@@ -50,7 +50,7 @@ export function Sidebar() {
     const { user, signOut } = useAuth();
 
     return (
-        <div className="w-64 border-r bg-white dark:bg-gray-950 flex flex-col h-screen fixed left-0 top-0">
+        <div className="hidden lg:flex w-64 border-r bg-white dark:bg-gray-950 flex-col h-screen fixed left-0 top-0">
             <div className="p-6">
                 <div className="mb-6 pl-1">
                     <Link href="/dashboard" className="cursor-pointer">
