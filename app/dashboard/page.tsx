@@ -4,8 +4,37 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, ArrowRight, Zap } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function DashboardPage() {
+    const { user } = useAuth();
+    const [generationsCount, setGenerationsCount] = useState(0);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!user) return;
+
+            // Get first day of current month
+            const date = new Date();
+            const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
+
+            const { count, error } = await supabase
+                .from('generations')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', user.id)
+                .gte('created_at', firstDay);
+
+            if (!error && count !== null) {
+                setGenerationsCount(count);
+            }
+        };
+
+        fetchStats();
+    }, [user, supabase]);
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -25,9 +54,9 @@ export default function DashboardPage() {
                         <Zap className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">13</div>
+                        <div className="text-2xl font-bold">{generationsCount}</div>
                         <p className="text-xs text-muted-foreground">
-                            +2 desde ayer
+                            Fichas generadas
                         </p>
                     </CardContent>
                 </Card>
@@ -37,9 +66,9 @@ export default function DashboardPage() {
                         <Sparkles className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">137</div>
+                        <div className="text-2xl font-bold">{user?.credits ?? 0}</div>
                         <p className="text-xs text-muted-foreground">
-                            De 150 totales (Plan Pro)
+                            Plan {user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : '...'}
                         </p>
                     </CardContent>
                 </Card>
@@ -63,3 +92,4 @@ export default function DashboardPage() {
         </div>
     );
 }
+

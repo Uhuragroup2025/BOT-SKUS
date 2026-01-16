@@ -4,8 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth-context";
 
 export default function PlansPage() {
+    const { user } = useAuth();
+    const currentPlan = user?.plan || 'lite';
+
     return (
         <div className="space-y-8 pb-10">
             <div className="text-center space-y-2">
@@ -15,7 +19,12 @@ export default function PlansPage() {
 
             <div className="grid md:grid-cols-3 gap-8 pt-4">
                 {/* LITE PLAN */}
-                <Card className="flex flex-col border-2 hover:border-primary/20 transition-colors">
+                <Card className={`flex flex-col border-2 transition-colors ${currentPlan === 'lite' ? 'border-primary shadow-lg' : 'hover:border-primary/20'}`}>
+                    {currentPlan === 'lite' && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                            <Badge className="bg-primary text-primary-foreground px-3 py-1">Tu Plan Actual</Badge>
+                        </div>
+                    )}
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Zap className="h-5 w-5 text-muted-foreground" />
@@ -33,18 +42,22 @@ export default function PlansPage() {
                         </ul>
                     </CardContent>
                     <CardFooter>
-                        <Button variant="outline" className="w-full">Seleccionar Lite</Button>
+                        <Button variant={currentPlan === 'lite' ? "secondary" : "outline"} className="w-full" disabled={currentPlan === 'lite'}>
+                            {currentPlan === 'lite' ? 'Plan Actual' : 'Seleccionar Lite'}
+                        </Button>
                     </CardFooter>
                 </Card>
 
-                {/* PRO PLAN (Highlighted) */}
-                <Card className="flex flex-col border-2 border-primary relative shadow-2xl scale-105 bg-white dark:bg-gray-900">
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                        <Badge className="bg-primary text-primary-foreground px-3 py-1">Más popular</Badge>
-                    </div>
+                {/* PRO PLAN */}
+                <Card className={`flex flex-col border-2 relative transition-all ${currentPlan === 'pro' ? 'border-primary shadow-xl scale-105' : 'hover:border-primary/20 bg-white dark:bg-gray-900'}`}>
+                    {currentPlan === 'pro' && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                            <Badge className="bg-primary text-primary-foreground px-3 py-1">Tu Plan Actual</Badge>
+                        </div>
+                    )}
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-primary">
-                            <Zap className="h-5 w-5 fill-primary" />
+                        <CardTitle className={`flex items-center gap-2 ${currentPlan === 'pro' ? 'text-primary' : ''}`}>
+                            <Zap className={`h-5 w-5 ${currentPlan === 'pro' ? 'fill-primary' : 'text-muted-foreground'}`} />
                             Pro
                         </CardTitle>
                         <CardDescription>Para crecimiento acelerado</CardDescription>
@@ -53,20 +66,27 @@ export default function PlansPage() {
                         <div className="text-4xl font-bold">$49 <span className="text-sm font-normal text-muted-foreground">/mes</span></div>
                         <div className="text-sm font-medium">150 fichas/mes</div>
                         <ul className="space-y-2 text-sm text-muted-foreground pt-4">
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Hasta 3 usuarios</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Descarga CSV y PDF</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Validaciones SEO/IA Avanzadas</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Análisis de competencia</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" /> Soporte prioritario</li>
+                            <li className="flex items-center gap-2"><Check className={`h-4 w-4 ${currentPlan === 'pro' ? 'text-primary' : 'text-green-500'}`} /> Hasta 3 usuarios</li>
+                            <li className="flex items-center gap-2"><Check className={`h-4 w-4 ${currentPlan === 'pro' ? 'text-primary' : 'text-green-500'}`} /> Descarga CSV y PDF</li>
+                            <li className="flex items-center gap-2"><Check className={`h-4 w-4 ${currentPlan === 'pro' ? 'text-primary' : 'text-green-500'}`} /> Validaciones SEO/IA Avanzadas</li>
+                            <li className="flex items-center gap-2"><Check className={`h-4 w-4 ${currentPlan === 'pro' ? 'text-primary' : 'text-green-500'}`} /> Análisis de competencia</li>
+                            <li className="flex items-center gap-2"><Check className={`h-4 w-4 ${currentPlan === 'pro' ? 'text-primary' : 'text-green-500'}`} /> Soporte prioritario</li>
                         </ul>
                     </CardContent>
                     <CardFooter>
-                        <Button className="w-full" disabled>Plan Actual</Button>
+                        <Button className="w-full" variant={currentPlan === 'pro' ? "secondary" : "default"} disabled={currentPlan === 'pro'}>
+                            {currentPlan === 'pro' ? 'Plan Actual' : 'Seleccionar Pro'}
+                        </Button>
                     </CardFooter>
                 </Card>
 
                 {/* ENTERPRISE PLAN */}
-                <Card className="flex flex-col border-2 hover:border-primary/20 transition-colors">
+                <Card className={`flex flex-col border-2 transition-colors ${currentPlan === 'enterprise' ? 'border-primary shadow-lg' : 'hover:border-primary/20'}`}>
+                    {currentPlan === 'enterprise' && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                            <Badge className="bg-primary text-primary-foreground px-3 py-1">Tu Plan Actual</Badge>
+                        </div>
+                    )}
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Zap className="h-5 w-5 text-muted-foreground" />
@@ -86,10 +106,13 @@ export default function PlansPage() {
                         </ul>
                     </CardContent>
                     <CardFooter>
-                        <Button variant="outline" className="w-full">Contactar Ventas</Button>
+                        <Button variant={currentPlan === 'enterprise' ? "secondary" : "outline"} className="w-full" disabled={currentPlan === 'enterprise'}>
+                            {currentPlan === 'enterprise' ? 'Plan Actual' : 'Contactar Ventas'}
+                        </Button>
                     </CardFooter>
                 </Card>
             </div>
         </div>
     );
 }
+

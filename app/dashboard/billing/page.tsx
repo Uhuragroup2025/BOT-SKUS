@@ -3,8 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreditCard, Download } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function BillingPage() {
+    const { user } = useAuth();
+    const planName = user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : 'Lite';
+
     return (
         <div className="space-y-6">
             <div>
@@ -33,12 +37,12 @@ export default function BillingPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Próxima factura</CardTitle>
-                        <CardDescription>Suscripción Plan Pro</CardDescription>
+                        <CardDescription>Suscripción Plan {planName}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         <div className="flex justify-between items-center text-sm">
                             <span>Total a pagar:</span>
-                            <span className="font-bold text-lg">$49.00 USD</span>
+                            <span className="font-bold text-lg">{user?.plan === 'enterprise' ? '$99.00' : user?.plan === 'pro' ? '$49.00' : '$0.00'} USD</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-muted-foreground">
                             <span>Fecha de cobro:</span>
@@ -57,23 +61,13 @@ export default function BillingPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
-                                <div>
-                                    <p className="font-medium">Factura #{1000 + i} - Plan Pro</p>
-                                    <p className="text-xs text-muted-foreground">15 Ene 2026</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-sm font-semibold">$49.00</span>
-                                    <Button variant="ghost" size="icon">
-                                        <Download className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
+                        <div className="text-center py-4 text-muted-foreground">
+                            No hay facturas disponibles.
+                        </div>
                     </div>
                 </CardContent>
             </Card>
         </div>
     );
 }
+

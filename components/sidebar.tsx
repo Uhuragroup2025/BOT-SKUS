@@ -52,21 +52,23 @@ export function Sidebar() {
     return (
         <div className="w-64 border-r bg-white dark:bg-gray-950 flex flex-col h-screen fixed left-0 top-0">
             <div className="p-6">
-                <div className="mb-4 pl-1">
-                    <div className="relative w-24 h-6 opacity-90">
-                        <Image
-                            src="/uhura-logo-v2.png"
-                            alt="Uhura Group"
-                            fill
-                            className="object-contain object-left"
-                            sizes="96px"
-                            priority
-                        />
-                    </div>
+                <div className="mb-6 pl-1">
+                    <Link href="/dashboard" className="cursor-pointer">
+                        <div className="relative w-40 h-12 opacity-90 transition-opacity hover:opacity-100">
+                            <Image
+                                src="/uhura-logo-v2.png"
+                                alt="Uhura Group"
+                                fill
+                                className="object-contain object-left"
+                                sizes="160px"
+                                priority
+                            />
+                        </div>
+                    </Link>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <div className="bg-primary text-white p-2 rounded-lg">
+                    <div className="bg-[#7F41DE] text-white p-2 rounded-lg shadow-sm">
                         <Sparkles size={20} />
                     </div>
                     <span className="font-bold text-lg tracking-tight">SKU Optimizer</span>

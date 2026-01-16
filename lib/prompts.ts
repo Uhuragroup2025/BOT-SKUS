@@ -17,7 +17,19 @@ Reglas por Canal:
 Si Ecommerce: Título H1 SEO, beneficio claro al inicio, lenguaje natural semántico, descripción educativa, AEO.
 Si Marketplace: Título estructurado (Marca + Tipo + Atributos), bullets de beneficio/detalle, enfoque en especificaciones y comparabilidad.
 
-Devuelve el contenido en formato JSON estructurado.
+Devuelve el contenido en formato JSON ESTRICTO con las siguientes claves exactas:
+{
+  "seoTitle": "string",
+  "shortDescription": "string",
+  "longDescription": "string",
+  "bullets": ["string", "string", ...],
+  "aeoSnippet": "string",
+  "metaDescription": "string",
+  "faq": [{"q": "string", "a": "string"}, ...],
+  "aiRecommendation": "string",
+  "score": number (0-100),
+  "imageAlt": ["string", "string", ...]
+}
 `;
 
 export function constructUserPrompt(data: {

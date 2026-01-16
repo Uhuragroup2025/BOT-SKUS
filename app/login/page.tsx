@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,16 +23,28 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-purple-50/30 via-white to-[#7F41DE]/10 dark:from-purple-950/30 dark:via-gray-950 dark:to-purple-900/10 p-4">
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-3xl"></div>
-                <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] rounded-full bg-indigo-500/10 blur-3xl"></div>
+                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-purple-500/10 blur-3xl"></div>
+                <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[#7F41DE]/10 blur-3xl"></div>
             </div>
 
             <Card className="w-full max-w-md relative z-10 border-none shadow-xl bg-white/80 backdrop-blur-md dark:bg-gray-900/80">
                 <CardHeader className="space-y-1 text-center">
+                    <div className="flex justify-center mb-6">
+                        <div className="relative w-32 h-8">
+                            <Image
+                                src="/uhura-logo-v2.png"
+                                alt="Uhura Group"
+                                fill
+                                className="object-contain"
+                                sizes="128px"
+                                priority
+                            />
+                        </div>
+                    </div>
                     <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                        <div className="w-12 h-12 bg-[#7F41DE]/10 rounded-xl flex items-center justify-center text-[#7F41DE]">
                             <Sparkles className="w-6 h-6" />
                         </div>
                     </div>
