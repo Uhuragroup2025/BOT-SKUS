@@ -7,7 +7,20 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function BillingPage() {
     const { user } = useAuth();
-    const planName = user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : 'Lite';
+    const getDisplayPlanName = (plan?: string) => {
+        if (!plan) return 'Free';
+        if (plan === 'lite' || plan === 'emprendedor') return 'Emprendedor';
+        return plan.charAt(0).toUpperCase() + plan.slice(1);
+    };
+
+    const planName = getDisplayPlanName(user?.plan);
+
+    const getPlanPrice = (plan?: string) => {
+        if (plan === 'enterprise') return '$149.00';
+        if (plan === 'pro') return '$49.00';
+        if (plan === 'lite' || plan === 'emprendedor') return '$19.00';
+        return '$0.00';
+    };
 
     return (
         <div className="space-y-6">
@@ -42,7 +55,7 @@ export default function BillingPage() {
                     <CardContent className="space-y-2">
                         <div className="flex justify-between items-center text-sm">
                             <span>Total a pagar:</span>
-                            <span className="font-bold text-lg">{user?.plan === 'enterprise' ? '$99.00' : user?.plan === 'pro' ? '$49.00' : '$0.00'} USD</span>
+                            <span className="font-bold text-lg">{getPlanPrice(user?.plan)} USD</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-muted-foreground">
                             <span>Fecha de cobro:</span>

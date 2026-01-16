@@ -9,7 +9,7 @@ interface UserProfile {
     id: string;
     email: string;
     name: string;
-    plan: "lite" | "pro" | "enterprise";
+    plan: "free" | "emprendedor" | "lite" | "pro" | "enterprise";
     credits: number;
 }
 
@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: sessionUser.id,
                     email: sessionUser.email!,
                     name: profile.full_name || sessionUser.email!,
-                    plan: profile.plan || 'lite',
-                    credits: profile.credits || 0
+                    plan: profile.plan || 'free',
+                    credits: profile.credits ?? 0
                 } as UserProfile;
             }
         } catch (err) {
@@ -87,8 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         id: session.user.id,
                         email: session.user.email!,
                         name: session.user.user_metadata?.full_name || session.user.email!,
-                        plan: 'lite',
-                        credits: 10
+                        plan: 'free',
+                        credits: 5
                     });
                 }
             }

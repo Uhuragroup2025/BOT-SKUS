@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles, AlertCircle, Copy, Check } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/lib/auth-context";
 
 interface GeneratedContent {
     seoTitle: string;
@@ -24,8 +25,10 @@ interface GeneratedContent {
 }
 
 export default function GeneratorPage() {
+    const { user, refreshProfile } = useAuth();
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<GeneratedContent | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     // Form States
     const [productName, setProductName] = useState("");
@@ -34,8 +37,17 @@ export default function GeneratorPage() {
     const [channel, setChannel] = useState("ecommerce");
     const [tone, setTone] = useState("comercial");
 
+    const credits = user?.credits ?? 0;
+
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+
+        if (credits <= 0) {
+            setError("No tienes créditos suficientes. Por favor, adquiere un plan.");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -53,13 +65,21 @@ export default function GeneratorPage() {
                 }),
             });
 
+            if (response.status === 403) {
+                const data = await response.json();
+                setError(data.error || "No tienes créditos suficientes.");
+                setLoading(false);
+                return;
+            }
+
             if (!response.ok) throw new Error("Error generating content");
 
             const data = await response.json();
             setResult(data);
+            await refreshProfile(); // Update credits in UI
         } catch (error) {
             console.error(error);
-            alert("Hubo un error al generar la ficha. Por favor intenta de nuevo.");
+            setError("Hubo un error al generar la ficha. Por favor intenta de nuevo.");
         } finally {
             setLoading(false);
         }
@@ -139,7 +159,15 @@ export default function GeneratorPage() {
                             </Select>
                         </div>
 
-                        <Button type="submit" className="w-full gap-2 py-6 text-lg" disabled={loading}>
+                        {error && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Atención</AlertTitle>
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        <Button type="submit" className="w-full gap-2 py-6 text-lg" disabled={loading || credits <= 0}>
                             <Sparkles className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
                             {loading ? "Generando..." : "Generar ficha optimizada"}
                         </Button>

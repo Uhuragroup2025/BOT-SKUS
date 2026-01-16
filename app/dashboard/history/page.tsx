@@ -295,7 +295,12 @@ export default function HistoryPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Historial de Fichas</h1>
                     <p className="text-muted-foreground">Gestiona y descarga tus contenidos generados previamente.</p>
                 </div>
-                <Button variant="outline" onClick={handleExportCSV}>
+                <Button
+                    variant="outline"
+                    onClick={handleExportCSV}
+                    disabled={user?.plan === 'free'}
+                    title={user?.plan === 'free' ? "Exportar CSV requiere un plan de pago" : ""}
+                >
                     <Download className="mr-2 h-4 w-4" />
                     Exportar CSV
                 </Button>
@@ -366,8 +371,13 @@ export default function HistoryPage() {
                                                         <DropdownMenuItem onClick={() => handleView(item)}>
                                                             <Eye className="mr-2 h-4 w-4" /> Ver ficha completa
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleDownloadPDF(item)}>
-                                                            <Download className="mr-2 h-4 w-4" /> Descargar PDF
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleDownloadPDF(item)}
+                                                            disabled={user?.plan === 'free'}
+                                                            className={user?.plan === 'free' ? "opacity-50 cursor-not-allowed" : ""}
+                                                        >
+                                                            <Download className="mr-2 h-4 w-4" />
+                                                            {user?.plan === 'free' ? 'Descargar PDF (Pro)' : 'Descargar PDF'}
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -410,9 +420,13 @@ export default function HistoryPage() {
                     </div>
 
                     <div className="flex justify-end gap-3 mt-8 pt-4 border-t">
-                        <Button variant="outline" onClick={() => selectedGeneration && handleDownloadPDF(selectedGeneration)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => selectedGeneration && handleDownloadPDF(selectedGeneration)}
+                            disabled={user?.plan === 'free'}
+                        >
                             <Download className="mr-2 h-4 w-4" />
-                            Descargar PDF
+                            {user?.plan === 'free' ? 'PDF bloqueado (Plan Free)' : 'Descargar PDF'}
                         </Button>
                         <Button onClick={() => setDialogOpen(false)} className="px-8 bg-primary hover:bg-primary/90 text-white">
                             Cerrar
