@@ -12,8 +12,11 @@ import { Sparkles, Loader2 } from "lucide-react";
 export default function LoginPage() {
     const { signIn } = useAuth();
     const [email, setEmail] = useState("");
+    const [fullName, setFullName] = useState("");
+    const [companyName, setCompanyName] = useState("");
     const [loading, setLoading] = useState(false);
     const [cooldown, setCooldown] = useState(0);
+    const [mode, setMode] = useState<"login" | "signup">("login");
 
     useEffect(() => {
         if (cooldown > 0) {
@@ -27,7 +30,12 @@ export default function LoginPage() {
         if (!email || cooldown > 0) return;
         setLoading(true);
         try {
-            await signIn(email);
+            const metadata = mode === "signup" ? {
+                full_name: fullName,
+                company_name: companyName
+            } : undefined;
+
+            await signIn(email, metadata);
             setCooldown(60); // Inicia cooldown de 60 segundos
         } catch (error) {
             console.error("Login attempt failed:", error);
@@ -62,15 +70,43 @@ export default function LoginPage() {
                             <Sparkles className="w-6 h-6" />
                         </div>
                     </div>
-                    <CardTitle className="text-2xl font-bold tracking-tight">Accede a SKU Optimizer</CardTitle>
+                    <CardTitle className="text-2xl font-bold tracking-tight">
+                        {mode === "login" ? "Accede a SKU Optimizer" : "Crea tu cuenta gratis"}
+                    </CardTitle>
                     <CardDescription className="max-w-sm mx-auto">
-                        Ingresa tu correo y te enviaremos un enlace seguro para entrar.
-                        <br />
-                        No necesitas contraseña.
+                        {mode === "login"
+                            ? "Ingresa tu correo y te enviaremos un enlace seguro para entrar. No necesitas contraseña."
+                            : "Regístrate con tus datos para empezar a optimizar tus productos hoy mismo."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form id="login-form" onSubmit={handleSubmit} className="space-y-4">
+                        {mode === "signup" && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="fullName">Nombre completo</Label>
+                                    <Input
+                                        id="fullName"
+                                        placeholder="Tu nombre"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        required
+                                        className="bg-white/50 dark:bg-gray-900/50"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="companyName">Nombre de la empresa</Label>
+                                    <Input
+                                        id="companyName"
+                                        placeholder="Tu empresa"
+                                        value={companyName}
+                                        onChange={(e) => setCompanyName(e.target.value)}
+                                        required
+                                        className="bg-white/50 dark:bg-gray-900/50"
+                                    />
+                                </div>
+                            </>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="email">Correo electrónico</Label>
                             <Input
@@ -90,10 +126,10 @@ export default function LoginPage() {
                         >
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             {loading
-                                ? "Enviando..."
+                                ? (mode === "login" ? "Enviando..." : "Registrando...")
                                 : cooldown > 0
                                     ? `Reintentar en ${cooldown}s`
-                                    : "Enviar enlace de acceso"}
+                                    : (mode === "login" ? "Enviar enlace de acceso" : "Registrarse ahora")}
                         </Button>
                         {cooldown > 0 && (
                             <p className="text-[11px] text-center text-orange-600 dark:text-orange-400 font-medium animate-pulse">
@@ -103,14 +139,21 @@ export default function LoginPage() {
                     </form>
                 </CardContent>
                 <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">
-                    <div>
-                        ¿No tienes cuenta? <span
-                            className="text-primary hover:underline cursor-pointer"
-                            onClick={() => {
-                                document.getElementById('email')?.focus();
-                            }}
-                        >Regístrate gratis</span>
-                    </div>
+                    {mode === "login" ? (
+                        <div>
+                            ¿No tienes cuenta? <span
+                                className="text-primary hover:underline cursor-pointer font-semibold"
+                                onClick={() => setMode("signup")}
+                            >Regístrate gratis</span>
+                        </div>
+                    ) : (
+                        <div>
+                            ¿Ya tienes cuenta? <span
+                                className="text-primary hover:underline cursor-pointer font-semibold"
+                                onClick={() => setMode("login")}
+                            >Inicia sesión</span>
+                        </div>
+                    )}
                 </CardFooter>
             </Card>
         </div>

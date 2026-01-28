@@ -9,6 +9,7 @@ interface UserProfile {
     id: string;
     email: string;
     name: string;
+    company_name?: string;
     plan: "free" | "emprendedor" | "lite" | "pro" | "enterprise";
     credits: number;
 }
@@ -16,7 +17,7 @@ interface UserProfile {
 interface AuthContextType {
     user: UserProfile | null;
     loading: boolean;
-    signIn: (email: string) => Promise<void>;
+    signIn: (email: string, metadata?: { full_name?: string, company_name?: string }) => Promise<void>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
 }
@@ -62,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     id: sessionUser.id,
                     email: sessionUser.email!,
                     name: profile.full_name || sessionUser.email!,
+                    company_name: profile.company_name,
                     plan: profile.plan || 'free',
                     credits: profile.credits ?? 0
                 } as UserProfile;
@@ -104,12 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         setUser(profile);
                     } else {
                         console.warn("AuthProvider: No profile found, using fallback session data");
+                        const isTeam = session.user.email?.endsWith("@uhuragroup.com");
                         setUser({
                             id: session.user.id,
                             email: session.user.email!,
                             name: session.user.user_metadata?.full_name || session.user.email!,
-                            plan: 'free',
-                            credits: 5
+                            plan: isTeam ? 'enterprise' : 'free',
+                            credits: isTeam ? 9999 : 5
                         });
                     }
                 } else {
@@ -128,12 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (profile) {
                         setUser(profile);
                     } else {
+                        const isTeam = session.user.email?.endsWith("@uhuragroup.com");
                         setUser({
                             id: session.user.id,
                             email: session.user.email!,
                             name: session.user.user_metadata?.full_name || session.user.email!,
-                            plan: 'free',
-                            credits: 5
+                            plan: isTeam ? 'enterprise' : 'free',
+                            credits: isTeam ? 9999 : 5
                         });
                     }
                 } else {
@@ -148,12 +152,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         initializeAuth();
     }, []);
 
-    const signIn = async (email: string) => {
+    const signIn = async (email: string, metadata?: { full_name?: string, company_name?: string }) => {
         setLoading(true);
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
                 emailRedirectTo: `${window.location.origin}/auth/callback`,
+                data: metadata ? {
+                    full_name: metadata.full_name,
+                    company_name: metadata.company_name
+                } : undefined
             },
         });
 

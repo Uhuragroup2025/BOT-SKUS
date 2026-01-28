@@ -19,6 +19,8 @@ export async function POST(req: Request) {
         );
     }
 
+    const isTeamUser = user.email?.endsWith("@uhuragroup.com");
+
     try {
         const body = await req.json();
         const {
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
             );
         }
 
-        if (profile.credits <= 0) {
+        if (!isTeamUser && profile.credits <= 0) {
             return NextResponse.json(
                 { error: "Insufficient credits. Please upgrade your plan." },
                 { status: 403 }
@@ -88,15 +90,16 @@ export async function POST(req: Request) {
 
         const parsedContent = JSON.parse(content);
 
-        // 4. Deduct Credit
-        const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ credits: profile.credits - 1 })
-            .eq('id', user.id);
+        // 4. Deduct Credit (only for non-team users)
+        if (!isTeamUser) {
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ credits: profile.credits - 1 })
+                .eq('id', user.id);
 
-        if (updateError) {
-            console.error("Error updating credits:", updateError);
-            // We proceed anyway since generation succeeded, but this is critical log
+            if (updateError) {
+                console.error("Error updating credits:", updateError);
+            }
         }
 
         // 5. Log Generation

@@ -94,22 +94,47 @@ export function Sidebar() {
             </div>
 
             <div className="p-4 border-t bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
-                <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Créditos mes</span>
-                        <span>13/150</span>
+                {user?.email?.endsWith("@uhuragroup.com") ? (
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                            <span>Acceso Equipo</span>
+                            <span className="text-primary">Ilimitado</span>
+                        </div>
+                        <Progress value={100} className="h-2 bg-primary/20" />
                     </div>
-                    <Progress value={8} className="h-2" />
-                </div>
+                ) : (
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Créditos {user?.plan === 'free' ? 'totales' : 'mes'}</span>
+                            <span>{user?.credits || 0}/{
+                                user?.plan === 'pro' ? '150' :
+                                    user?.plan === 'lite' || user?.plan === 'emprendedor' ? '20' :
+                                        user?.plan === 'enterprise' ? '∞' : '5'
+                            }</span>
+                        </div>
+                        <Progress
+                            value={
+                                user?.plan === 'enterprise' ? 100 :
+                                    ((user?.credits || 0) / (
+                                        user?.plan === 'pro' ? 150 :
+                                            user?.plan === 'lite' || user?.plan === 'emprendedor' ? 20 : 5
+                                    )) * 100
+                            }
+                            className="h-2"
+                        />
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between pt-2">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-xs">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
                             {user?.name?.substring(0, 2).toUpperCase() || "US"}
                         </div>
                         <div className="flex flex-col truncate">
                             <span className="text-sm font-medium truncate">{user?.name}</span>
-                            <span className="text-xs text-muted-foreground">Plan Pro</span>
+                            <span className="text-xs text-muted-foreground capitalize">
+                                Plan {user?.email?.endsWith("@uhuragroup.com") ? "Equipo" : (user?.plan || "Free")}
+                            </span>
                         </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 text-muted-foreground hover:text-red-500">
