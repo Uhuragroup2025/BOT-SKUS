@@ -125,14 +125,14 @@ export default function GeneratorPage() {
         }
     };
 
-    const handleExtract = async (text: string) => {
+    const handleExtract = async (text?: string, image?: string) => {
         setExtracting(true);
         setError(null);
         try {
             const response = await fetch("/api/extract", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ text, image }),
             });
             if (!response.ok) throw new Error("Extraction failed");
             const data = await response.json();
@@ -145,6 +145,24 @@ export default function GeneratorPage() {
         } finally {
             setExtracting(false);
         }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validar que sea imagen
+        if (!file.type.startsWith('image/')) {
+            setError("Por favor selecciona un archivo de imagen.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            const base64 = reader.result as string;
+            await handleExtract(undefined, base64);
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleConfirmExtraction = () => {
@@ -261,23 +279,46 @@ export default function GeneratorPage() {
                                 className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
                                 id="smart-extract-text"
                             />
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                className="w-full bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-none gap-2"
-                                onClick={() => {
-                                    const text = (document.getElementById('smart-extract-text') as HTMLTextAreaElement).value;
-                                    if (text) handleExtract(text);
-                                }}
-                                disabled={extracting}
-                            >
-                                {extracting ? (
-                                    <Sparkles className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <FileText className="w-4 h-4" />
-                                )}
-                                {extracting ? "Analizando..." : "Extraer datos automáticamente"}
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="flex-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-none gap-2"
+                                    onClick={() => {
+                                        const text = (document.getElementById('smart-extract-text') as HTMLTextAreaElement).value;
+                                        if (text) handleExtract(text);
+                                    }}
+                                    disabled={extracting}
+                                >
+                                    {extracting ? (
+                                        <Sparkles className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <FileText className="w-4 h-4" />
+                                    )}
+                                    {extracting ? "Analizando..." : "Extraer de texto"}
+                                </Button>
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        id="file-upload"
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={handleFileChange}
+                                        disabled={extracting}
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="bg-white dark:bg-gray-900 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 gap-2"
+                                        onClick={() => document.getElementById('file-upload')?.click()}
+                                        disabled={extracting}
+                                        type="button"
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        Subir imagen
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -378,8 +419,8 @@ export default function GeneratorPage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="ecommerce">Ecommerce propio</SelectItem>
-                                        <SelectItem value="marketplace">Marketplace (MELI/Amazon)</SelectItem>
+                                        <SelectItem value="ecommerce">Tienda online VTEX/Shopify</SelectItem>
+                                        <SelectItem value="marketplace">Marketplace Mercadolibre/Amazon</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
