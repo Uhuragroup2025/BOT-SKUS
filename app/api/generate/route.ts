@@ -21,7 +21,10 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { productName, features, category, channel, tone } = body;
+        const {
+            productName, features, category, channel, tone,
+            type, brand, model, presentation, material, mainUse, benefits, certification
+        } = body;
 
         if (!productName || !features) {
             return NextResponse.json(
@@ -58,6 +61,14 @@ export async function POST(req: Request) {
             category,
             channel,
             tone,
+            type,
+            brand,
+            model,
+            presentation,
+            material,
+            mainUse,
+            benefits,
+            certification
         });
 
         const completion = await openai.chat.completions.create({

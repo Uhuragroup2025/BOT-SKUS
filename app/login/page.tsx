@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,27 @@ export default function LoginPage() {
     const { signIn } = useAuth();
     const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
+
+    useEffect(() => {
+        if (cooldown > 0) {
+            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [cooldown]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email) return;
+        if (!email || cooldown > 0) return;
         setLoading(true);
-        await signIn(email);
-        setLoading(false);
+        try {
+            await signIn(email);
+            setCooldown(60); // Inicia cooldown de 60 segundos
+        } catch (error) {
+            console.error("Login attempt failed:", error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -48,9 +62,11 @@ export default function LoginPage() {
                             <Sparkles className="w-6 h-6" />
                         </div>
                     </div>
-                    <CardTitle className="text-2xl font-bold tracking-tight">Bienvenido a SKU Optimizer</CardTitle>
+                    <CardTitle className="text-2xl font-bold tracking-tight">Accede a SKU Optimizer</CardTitle>
                     <CardDescription className="max-w-sm mx-auto">
-                        Genera fichas de producto optimizadas para SEO, buscadores con IA y asistentes como ChatGPT, Gemini y otros motores de descubrimiento.
+                        Ingresa tu correo y te enviaremos un enlace seguro para entrar.
+                        <br />
+                        No necesitas contraseña.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -67,20 +83,23 @@ export default function LoginPage() {
                                 className="bg-white/50 dark:bg-gray-900/50"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Contraseña (Demo: cualquiera)</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="••••••••"
-                                required
-                                className="bg-white/50 dark:bg-gray-900/50"
-                            />
-                        </div>
-                        <Button type="submit" className="w-full bg-primary hover:bg-primary/90 transition-colors" disabled={loading}>
+                        <Button
+                            type="submit"
+                            className="w-full bg-primary hover:bg-primary/90 transition-colors"
+                            disabled={loading || cooldown > 0}
+                        >
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+                            {loading
+                                ? "Enviando..."
+                                : cooldown > 0
+                                    ? `Reintentar en ${cooldown}s`
+                                    : "Enviar enlace de acceso"}
                         </Button>
+                        {cooldown > 0 && (
+                            <p className="text-[11px] text-center text-orange-600 dark:text-orange-400 font-medium animate-pulse">
+                                ⏳ Espera antes de pedir otro enlace para evitar bloqueos
+                            </p>
+                        )}
                     </form>
                 </CardContent>
                 <CardFooter className="flex flex-col space-y-2 text-center text-sm text-muted-foreground">

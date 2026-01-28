@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FileText, MoreHorizontal, Download, Eye, Copy, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { jsPDF } from "jspdf";
@@ -18,7 +18,7 @@ interface Generation {
     product_name: string;
     created_at: string;
     settings: {
-        category: string;
+        category?: string;
         channel?: string;
         tone?: string;
     };
@@ -57,29 +57,44 @@ export default function HistoryPage() {
     const [loading, setLoading] = useState(true);
     const [selectedGeneration, setSelectedGeneration] = useState<Generation | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const supabase = createClient();
+
+    // Memoize supabase client to avoid infinite loops in useEffect
+    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
         const fetchGenerations = async () => {
-            if (authLoading) return;
+            console.log("HistoryPage: Attempting to fetch generations...");
+
+            if (authLoading) {
+                console.log("HistoryPage: authLoading is true, waiting...");
+                return;
+            }
 
             if (!user) {
+                console.log("HistoryPage: No user found, stopping loading.");
                 setLoading(false);
                 return;
             }
 
-            const { data, error } = await supabase
-                .from('generations')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
+            try {
+                console.log("HistoryPage: Fetching data for user:", user.id);
+                const { data, error } = await supabase
+                    .from('generations')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
 
-            if (error) {
-                console.error("Error fetching generations:", error);
-            } else {
-                setGenerations(data || []);
+                if (error) {
+                    console.error("HistoryPage: Error result from Supabase:", error);
+                } else {
+                    console.log("HistoryPage: Fetched", data?.length || 0, "generations");
+                    setGenerations(data || []);
+                }
+            } catch (err) {
+                console.error("HistoryPage: Unexpected error during fetch:", err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         fetchGenerations();

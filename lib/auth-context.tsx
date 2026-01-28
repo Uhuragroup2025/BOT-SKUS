@@ -37,14 +37,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchProfile = async (sessionUser: SupabaseUser) => {
         try {
+            console.log("Fetching profile for user:", sessionUser.id, sessionUser.email);
             const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', sessionUser.id)
-                .single();
+                .maybeSingle();
 
             if (error) {
-                console.error("Error fetching profile:", error);
+                console.error("AuthProvider: Error in fetchProfile query detected.");
+                console.error("AuthProvider: Raw error object:", error);
+                console.error("AuthProvider: Error message:", error.message);
+                console.error("AuthProvider: Error code:", error.code);
+                try {
+                    console.error("AuthProvider: Error JSON:", JSON.stringify(error));
+                } catch (e) {
+                    console.error("AuthProvider: Error could not be stringified");
+                }
                 return null;
             }
 
@@ -56,9 +65,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     plan: profile.plan || 'free',
                     credits: profile.credits ?? 0
                 } as UserProfile;
+            } else {
+                console.log("No profile found for user:", sessionUser.id);
             }
         } catch (err) {
-            console.error("Unexpected error fetching profile:", err);
+            console.error("Unexpected error in fetchProfile catch block:", err);
         }
         return null;
     };
@@ -75,29 +86,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const initializeAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+            try {
+                console.log("AuthProvider: Initializing...");
+                console.log("AuthProvider: URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+                console.log("AuthProvider: Key Prefix:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 15));
 
-            if (session?.user) {
-                const profile = await fetchProfile(session.user);
-                if (profile) {
-                    setUser(profile);
-                } else {
-                    // Fallback if profile doesn't exist yet (should be handled by trigger, but just in case)
-                    setUser({
-                        id: session.user.id,
-                        email: session.user.email!,
-                        name: session.user.user_metadata?.full_name || session.user.email!,
-                        plan: 'free',
-                        credits: 5
-                    });
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (sessionError) {
+                    console.error("AuthProvider: Error getting session:", sessionError);
                 }
-            }
-            setLoading(false);
 
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+                if (session?.user) {
+                    console.log("AuthProvider: Session found for:", session.user.email);
+                    const profile = await fetchProfile(session.user);
+                    if (profile) {
+                        setUser(profile);
+                    } else {
+                        console.warn("AuthProvider: No profile found, using fallback session data");
+                        setUser({
+                            id: session.user.id,
+                            email: session.user.email!,
+                            name: session.user.user_metadata?.full_name || session.user.email!,
+                            plan: 'free',
+                            credits: 5
+                        });
+                    }
+                } else {
+                    console.log("AuthProvider: No active session found during initialization");
+                }
+            } catch (err) {
+                console.error("AuthProvider: Unexpected initialization error:", err);
+            } finally {
+                setLoading(false);
+            }
+
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                console.log("AuthProvider: Auth state changed:", event, session?.user?.email);
                 if (session?.user) {
                     const profile = await fetchProfile(session.user);
-                    if (profile) setUser(profile);
+                    if (profile) {
+                        setUser(profile);
+                    } else {
+                        setUser({
+                            id: session.user.id,
+                            email: session.user.email!,
+                            name: session.user.user_metadata?.full_name || session.user.email!,
+                            plan: 'free',
+                            credits: 5
+                        });
+                    }
                 } else {
                     setUser(null);
                 }
@@ -123,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.error("Error signing in:", error);
             alert("Error login: " + error.message);
         } else {
-            alert("Check your email for the login link!");
+            alert("📩 Revisa tu correo\nTe enviamos un enlace seguro para ingresar a tu cuenta.\nSi no lo ves, revisa spam o promociones.");
         }
         setLoading(false);
     };

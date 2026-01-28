@@ -7,8 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, AlertCircle, Copy, Check } from "lucide-react";
+import { Sparkles, AlertCircle, Copy, Check, FileText } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription
+} from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 
 interface GeneratedContent {
@@ -22,13 +30,29 @@ interface GeneratedContent {
     aiRecommendation: string;
     score: number;
     imageAlt: string[];
+    visualPack?: {
+        id: number;
+        title: string;
+        visual: string;
+        copy: {
+            text?: string;
+            headline?: string;
+            subheadline?: string;
+            bullets?: string[];
+            seals?: string[];
+        }
+    }[];
+    inputRecommendations?: string[];
 }
 
 export default function GeneratorPage() {
     const { user, refreshProfile } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [extracting, setExtracting] = useState(false);
     const [result, setResult] = useState<GeneratedContent | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [extractionData, setExtractionData] = useState<any>(null);
+    const [showReviewModal, setShowReviewModal] = useState(false);
 
     // Form States
     const [productName, setProductName] = useState("");
@@ -36,6 +60,15 @@ export default function GeneratorPage() {
     const [category, setCategory] = useState("");
     const [channel, setChannel] = useState("ecommerce");
     const [tone, setTone] = useState("comercial");
+
+    // New Structured Fields
+    const [productType, setProductType] = useState("Belleza & Cuidado Personal");
+    const [brand, setBrand] = useState("");
+    const [model, setModel] = useState("");
+    const [presentation, setPresentation] = useState("");
+    const [material, setMaterial] = useState("");
+    const [mainUse, setMainUse] = useState("");
+    const [certification, setCertification] = useState("");
 
     const credits = user?.credits ?? 0;
 
@@ -62,6 +95,13 @@ export default function GeneratorPage() {
                     category,
                     channel,
                     tone,
+                    type: productType,
+                    brand,
+                    model,
+                    presentation,
+                    material,
+                    mainUse,
+                    certification,
                 }),
             });
 
@@ -85,78 +125,277 @@ export default function GeneratorPage() {
         }
     };
 
+    const handleExtract = async (text: string) => {
+        setExtracting(true);
+        setError(null);
+        try {
+            const response = await fetch("/api/extract", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text }),
+            });
+            if (!response.ok) throw new Error("Extraction failed");
+            const data = await response.json();
+
+            setExtractionData(data);
+            setShowReviewModal(true);
+        } catch (err) {
+            console.error(err);
+            setError("Error al extraer datos. Intenta ingresarlos manualmente.");
+        } finally {
+            setExtracting(false);
+        }
+    };
+
+    const handleConfirmExtraction = () => {
+        if (extractionData) {
+            if (extractionData.brand) setBrand(extractionData.brand);
+            if (extractionData.model) setModel(extractionData.model);
+            if (extractionData.presentation) setPresentation(extractionData.presentation);
+            if (extractionData.material) setMaterial(extractionData.material);
+            if (extractionData.mainUse) setMainUse(extractionData.mainUse);
+            if (extractionData.certification) setCertification(extractionData.certification);
+        }
+        setShowReviewModal(false);
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:h-[calc(100vh-8rem)]">
+            {/* Modal de Revisión de Extracción */}
+            <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-purple-600" />
+                            Revisar Datos Extraídos
+                        </DialogTitle>
+                        <DialogDescription>
+                            Hemos analizado tu texto. Verifica que los datos sean correctos antes de aplicarlos al formulario.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {extractionData && (
+                        <div className="space-y-4 my-4 max-h-[40vh] overflow-y-auto pr-2">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] uppercase font-bold opacity-50">Marca</Label>
+                                    <Input
+                                        value={extractionData.brand || ""}
+                                        onChange={(e) => setExtractionData({ ...extractionData, brand: e.target.value })}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] uppercase font-bold opacity-50">Modelo</Label>
+                                    <Input
+                                        value={extractionData.model || ""}
+                                        onChange={(e) => setExtractionData({ ...extractionData, model: e.target.value })}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] uppercase font-bold opacity-50">Presentación</Label>
+                                <Input
+                                    value={extractionData.presentation || ""}
+                                    onChange={(e) => setExtractionData({ ...extractionData, presentation: e.target.value })}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] uppercase font-bold opacity-50">Material / Ingredientes</Label>
+                                <Input
+                                    value={extractionData.material || ""}
+                                    onChange={(e) => setExtractionData({ ...extractionData, material: e.target.value })}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] uppercase font-bold opacity-50">Uso Principal</Label>
+                                <Input
+                                    value={extractionData.mainUse || ""}
+                                    onChange={(e) => setExtractionData({ ...extractionData, mainUse: e.target.value })}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] uppercase font-bold opacity-50">Certificación / Prueba</Label>
+                                <Input
+                                    value={extractionData.certification || ""}
+                                    onChange={(e) => setExtractionData({ ...extractionData, certification: e.target.value })}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowReviewModal(false)}>Cancelar</Button>
+                        <Button onClick={handleConfirmExtraction} className="bg-purple-600 hover:bg-purple-700">Confirmar y Rellenar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             {/* LEFT COLUMN: FORM */}
             <Card className="h-full lg:overflow-y-auto border-none shadow-md">
                 <CardContent className="p-6 space-y-6">
-                    <div className="space-y-2">
-                        <h2 className="text-xl font-semibold">Datos del producto</h2>
-                        <p className="text-sm text-muted-foreground">Completa los detalles para que la IA haga su magia.</p>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-semibold">Datos del producto</h2>
+                                <p className="text-sm text-muted-foreground">Completa los detalles o usa la extracción inteligente.</p>
+                            </div>
+                            <div className="bg-primary/5 p-2 rounded-lg border border-primary/10">
+                                <Label className="text-[10px] uppercase font-bold text-primary block mb-1">Tu Créditos</Label>
+                                <div className="text-lg font-bold text-center">{credits}</div>
+                            </div>
+                        </div>
+
+                        {/* SMART EXTRACTION */}
+                        <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 space-y-3">
+                            <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                                <Sparkles className="w-4 h-4" />
+                                <span className="text-sm font-semibold">Smart Extraction (BETA)</span>
+                            </div>
+                            <Textarea
+                                placeholder="Pega aquí un PDF extraído, descripción larga o texto del producto para auto-rellenar..."
+                                className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
+                                id="smart-extract-text"
+                            />
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-none gap-2"
+                                onClick={() => {
+                                    const text = (document.getElementById('smart-extract-text') as HTMLTextAreaElement).value;
+                                    if (text) handleExtract(text);
+                                }}
+                                disabled={extracting}
+                            >
+                                {extracting ? (
+                                    <Sparkles className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <FileText className="w-4 h-4" />
+                                )}
+                                {extracting ? "Analizando..." : "Extraer datos automáticamente"}
+                            </Button>
+                        </div>
                     </div>
 
                     <form onSubmit={handleGenerate} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="type">Tipo de producto *</Label>
+                                <Select value={productType} onValueChange={setProductType}>
+                                    <SelectTrigger id="type">
+                                        <SelectValue placeholder="Categoría macro" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Belleza & Cuidado Personal">Belleza & Cuidado Personal</SelectItem>
+                                        <SelectItem value="Salud / Institucional">Salud / Institucional</SelectItem>
+                                        <SelectItem value="Alimentos & Bebidas">Alimentos & Bebidas</SelectItem>
+                                        <SelectItem value="Hogar & Limpieza">Hogar & Limpieza</SelectItem>
+                                        <SelectItem value="Mascotas">Mascotas</SelectItem>
+                                        <SelectItem value="Tecnología">Tecnología</SelectItem>
+                                        <SelectItem value="Moda & Accesorios">Moda & Accesorios</SelectItem>
+                                        <SelectItem value="Bebés">Bebés</SelectItem>
+                                        <SelectItem value="Ferretería / Industrial">Ferretería / Industrial</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Subcategoría / tipo *</Label>
+                                <Input
+                                    id="category"
+                                    placeholder="Ej: Labial, Detergente..."
+                                    required
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="name">Nombre del producto *</Label>
+                            <Label htmlFor="name">Nombre base del producto *</Label>
                             <Input
                                 id="name"
-                                placeholder="Ej: Zapatillas Running Pro X1"
+                                placeholder="Ej: Jabón de manos antibacterial"
                                 required
                                 value={productName}
                                 onChange={(e) => setProductName(e.target.value)}
                             />
                         </div>
 
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="brand">Marca</Label>
+                                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Ej: Protex" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="model">Modelo / Línea</Label>
+                                <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Ej: Aloe Vera" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="presentation">Presentación</Label>
+                                <Input id="presentation" value={presentation} onChange={(e) => setPresentation(e.target.value)} placeholder="Ej: 500ml, Pack x3" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="material">Material / Ingredientes</Label>
+                                <Input id="material" value={material} onChange={(e) => setMaterial(e.target.value)} placeholder="Ej: Nitrilo, Acero..." />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="mainUse">Uso Principal</Label>
+                                <Input id="mainUse" value={mainUse} onChange={(e) => setMainUse(e.target.value)} placeholder="Ej: Rostro, Industrial..." />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="certification">Certificación / Garantía</Label>
+                                <Input id="certification" value={certification} onChange={(e) => setCertification(e.target.value)} placeholder="Ej: Cruelty Free, ISO..." />
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="features">Características principales *</Label>
+                            <Label htmlFor="features">Otras especificaciones / texto libre *</Label>
                             <Textarea
                                 id="features"
-                                placeholder="Material transpirable, suela de gel, talla 40, color negro..."
-                                className="h-32 resize-none"
+                                placeholder="Cualquier otro detalle relevante aquí..."
+                                className="h-24 resize-none"
                                 required
                                 value={features}
                                 onChange={(e) => setFeatures(e.target.value)}
                             />
-                            <p className="text-xs text-muted-foreground text-right">Separa cada característica con comas</p>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="category">Categoría del producto (Tags) *</Label>
-                            <Input
-                                id="category"
-                                placeholder="Ej: Deportes, Calzado, Hogar (separados por coma)"
-                                required
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="channel">Canal de publicación *</Label>
-                            <Select value={channel} onValueChange={setChannel}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecciona un canal" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ecommerce">Ecommerce Propio (SEO/Storytelling)</SelectItem>
-                                    <SelectItem value="marketplace">Marketplace (Amazon/MercadoLibre)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="tone">Tono de redacción *</Label>
-                            <Select value={tone} onValueChange={setTone}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecciona un tono" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="comercial">Comercial (Ventas)</SelectItem>
-                                    <SelectItem value="tecnico">Técnico (Especificaciones)</SelectItem>
-                                    <SelectItem value="cercano">Cercano (Amigable)</SelectItem>
-                                    <SelectItem value="profesional">Profesional (Corporativo)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="channel">Canal *</Label>
+                                <Select value={channel} onValueChange={setChannel}>
+                                    <SelectTrigger id="channel">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ecommerce">Ecommerce propio</SelectItem>
+                                        <SelectItem value="marketplace">Marketplace (MELI/Amazon)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="tone">Tono *</Label>
+                                <Select value={tone} onValueChange={setTone}>
+                                    <SelectTrigger id="tone">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="comercial">Comercial</SelectItem>
+                                        <SelectItem value="tecnico">Técnico</SelectItem>
+                                        <SelectItem value="cercano">Cercano</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
                         {error && (
@@ -167,9 +406,9 @@ export default function GeneratorPage() {
                             </Alert>
                         )}
 
-                        <Button type="submit" className="w-full gap-2 py-6 text-lg" disabled={loading || credits <= 0}>
+                        <Button type="submit" className="w-full gap-2 py-6 text-lg bg-primary hover:bg-primary/90" disabled={loading || credits <= 0}>
                             <Sparkles className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
-                            {loading ? "Generando..." : "Generar ficha optimizada"}
+                            {loading ? "Generando visuales y ficha..." : "Generar ficha optimizada"}
                         </Button>
                     </form>
                 </CardContent>
@@ -185,63 +424,117 @@ export default function GeneratorPage() {
                     </div>
                 ) : (
                     <div className="space-y-6 animate-fadeIn pb-10">
-                        {/* SCORE CARD */}
-                        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-100 dark:border-blue-900">
-                            <CardContent className="p-6 flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-semibold text-blue-900 dark:text-blue-100">9. Score de validación SEO/IA</h3>
-                                    <p className="text-sm text-blue-700 dark:text-blue-300">Optimización alta</p>
-                                </div>
-                                <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">{result.score}/100</div>
-                            </CardContent>
-                        </Card>
-
-                        <ResultBlock label="1. Título SEO" content={result.seoTitle} limit={60} />
-                        <ResultBlock label="2. Descripción corta" content={result.shortDescription} limit={150} />
-                        <ResultBlock label="3. Descripción larga" content={result.longDescription} limit={800} isLong />
-
-                        <Card>
-                            <CardContent className="p-4 space-y-2">
-                                <Label className="font-bold text-base">4. Bullets destacados</Label>
-                                <ul className="list-disc pl-5 space-y-1 text-sm">
-                                    {(result.bullets || []).map((b, i) => <li key={i}>{b}</li>)}
-                                </ul>
-                            </CardContent>
-                        </Card>
-
-                        <ResultBlock label="5. Snippet AEO (Pregunta + Respuesta)" content={result.aeoSnippet} />
-                        <ResultBlock label="6. Meta descripción SEO" content={result.metaDescription} limit={155} />
-
-                        <Card>
-                            <CardContent className="p-4 space-y-3">
-                                <Label className="font-bold text-base">7. Preguntas frecuentes (FAQ)</Label>
-                                {(result.faq || []).map((item, i) => (
-                                    <div key={i} className="text-sm border-l-2 pl-3 border-primary/20">
-                                        <p className="font-semibold text-primary">{item.q}</p>
-                                        <p className="text-muted-foreground">{item.a}</p>
+                        {/* INPUT READINESS SCORE */}
+                        <Card className={`border-none shadow-sm ${result.score > 70 ? 'bg-green-50 dark:bg-green-950/20' : 'bg-yellow-50 dark:bg-yellow-950/20'}`}>
+                            <CardContent className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="font-bold text-lg">Input Readiness Score</h3>
+                                        <p className="text-sm opacity-80">Calidad de la información proporcionada</p>
                                     </div>
-                                ))}
+                                    <div className="text-4xl font-black">{result.score}/100</div>
+                                </div>
+                                {result.inputRecommendations && result.inputRecommendations.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold uppercase tracking-wider opacity-60">Recomendaciones para mejorar:</p>
+                                        <ul className="text-sm space-y-1">
+                                            {result.inputRecommendations.map((rec, i) => (
+                                                <li key={i} className="flex gap-2 items-start">
+                                                    <AlertCircle className="w-3 h-3 mt-1 shrink-0" />
+                                                    {rec}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
 
-                        <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-900 text-yellow-800 dark:text-yellow-200">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>8. Recomendación IA</AlertTitle>
-                            <AlertDescription>{result.aiRecommendation}</AlertDescription>
-                        </Alert>
-
-                        <Card>
-                            <CardContent className="p-4 space-y-2">
-                                <Label className="font-bold text-base">10. Frases sugeridas para atributos ALT de imágenes</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {(result.imageAlt || []).map((alt, i) => (
-                                        <span key={i} className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs border">
-                                            {alt}
-                                        </span>
+                        {/* VISUAL PACK */}
+                        {result.visualPack && (
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-bold flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-primary" />
+                                    Visual Pack (5 imágenes sugeridas)
+                                </h3>
+                                <div className="space-y-4">
+                                    {result.visualPack.map((img) => (
+                                        <Card key={img.id} className="overflow-hidden border-primary/10">
+                                            <div className="bg-primary/5 px-4 py-2 border-b border-primary/10 flex justify-between items-center">
+                                                <span className="font-bold text-sm">Imagen {img.id}: {img.title}</span>
+                                            </div>
+                                            <CardContent className="p-4 space-y-3">
+                                                <div>
+                                                    <Label className="text-[10px] uppercase font-bold opacity-50">Instrucción Visual</Label>
+                                                    <p className="text-sm italic">{img.visual}</p>
+                                                </div>
+                                                <div className="bg-gray-50 dark:bg-gray-950 p-3 rounded-lg border">
+                                                    <Label className="text-[10px] uppercase font-bold opacity-50 block mb-2">Copy Sugerido</Label>
+                                                    {img.copy.headline && <p className="font-bold text-primary">{img.copy.headline}</p>}
+                                                    {img.copy.subheadline && <p className="text-sm font-medium">{img.copy.subheadline}</p>}
+                                                    {img.copy.text && <p className="text-sm">{img.copy.text}</p>}
+                                                    {img.copy.bullets && (
+                                                        <ul className="list-disc pl-4 text-xs mt-2 space-y-1">
+                                                            {img.copy.bullets.map((b, idx) => <li key={idx}>{b}</li>)}
+                                                        </ul>
+                                                    )}
+                                                    {img.copy.seals && (
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            {img.copy.seals.map((s, idx) => (
+                                                                <span key={idx} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
+                                                                    {s}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
                                     ))}
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </div>
+                        )}
+
+                        <div className="border-t pt-8 mt-8 space-y-6 disabled">
+                            <h3 className="text-lg font-bold">Ficha de Producto Estructurada</h3>
+                            <ResultBlock label="1. Título SEO" content={result.seoTitle} limit={60} />
+                            <ResultBlock label="2. Descripción corta" content={result.shortDescription} limit={150} />
+                            <ResultBlock label="3. Descripción larga" content={result.longDescription} limit={800} isLong />
+
+                            <Card>
+                                <CardContent className="p-4 space-y-2">
+                                    <Label className="font-bold text-base">4. Bullets destacados</Label>
+                                    <ul className="list-disc pl-5 space-y-1 text-sm">
+                                        {(result.bullets || []).map((b, i) => <li key={i}>{b}</li>)}
+                                    </ul>
+                                </CardContent>
+                            </Card>
+
+                            <ResultBlock label="5. Snippet AEO" content={result.aeoSnippet} />
+                            <ResultBlock label="6. Meta descripción" content={result.metaDescription} limit={155} />
+
+                            <Card>
+                                <CardContent className="p-4 space-y-3">
+                                    <Label className="font-bold text-base">7. Preguntas frecuentes (FAQ)</Label>
+                                    {(result.faq || []).map((item, i) => (
+                                        <div key={i} className="text-sm border-l-2 pl-3 border-primary/20">
+                                            <p className="font-semibold text-primary">{item.q}</p>
+                                            <p className="text-muted-foreground">{item.a}</p>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+
+                            {result.aiRecommendation && (
+                                <Alert className="bg-primary/5 border-primary/20">
+                                    <Sparkles className="h-4 w-4 text-primary" />
+                                    <AlertTitle className="text-primary font-bold">Recomendación Estratégica</AlertTitle>
+                                    <AlertDescription className="text-sm italic">
+                                        {result.aiRecommendation}
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
@@ -267,5 +560,5 @@ function ResultBlock({ label, content, limit, isLong }: { label: string, content
                 )}
             </CardContent>
         </Card>
-    )
+    );
 }
