@@ -116,11 +116,13 @@ export default function GeneratorPage() {
 
             const data = await response.json();
             setResult(data);
-            await refreshProfile(); // Update credits in UI
+            setLoading(false); // Reset loading immediately after getting result
+
+            // Refresh credits in background
+            refreshProfile().catch(err => console.error("Error refreshing profile:", err));
         } catch (error) {
             console.error(error);
             setError("Hubo un error al generar la ficha. Por favor intenta de nuevo.");
-        } finally {
             setLoading(false);
         }
     };
@@ -366,7 +368,7 @@ export default function GeneratorPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="brand">Marca</Label>
                                 <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Ej: Protex" />
@@ -377,7 +379,7 @@ export default function GeneratorPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="presentation">Presentación</Label>
                                 <Input id="presentation" value={presentation} onChange={(e) => setPresentation(e.target.value)} placeholder="Ej: 500ml, Pack x3" />
@@ -388,7 +390,7 @@ export default function GeneratorPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="mainUse">Uso Principal</Label>
                                 <Input id="mainUse" value={mainUse} onChange={(e) => setMainUse(e.target.value)} placeholder="Ej: Rostro, Industrial..." />
@@ -411,7 +413,7 @@ export default function GeneratorPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="channel">Canal *</Label>
                                 <Select value={channel} onValueChange={setChannel}>

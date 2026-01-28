@@ -20,6 +20,7 @@ interface AuthContextType {
     signIn: (email: string, metadata?: { full_name?: string, company_name?: string }) => Promise<void>;
     signOut: () => Promise<void>;
     refreshProfile: () => Promise<void>;
+    checkUser: (email: string) => Promise<{ exists: boolean }>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -28,13 +29,16 @@ const AuthContext = createContext<AuthContextType>({
     signIn: async () => { },
     signOut: async () => { },
     refreshProfile: async () => { },
+    checkUser: async () => ({ exists: false }),
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<UserProfile | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = React.useState<UserProfile | null>(null);
+    const [loading, setLoading] = React.useState(true);
     const router = useRouter();
-    const supabase = createClient();
+
+    // Stable singleton instance
+    const supabase = React.useMemo(() => createClient(), []);
 
     const fetchProfile = async (sessionUser: SupabaseUser) => {
         try {
@@ -124,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setLoading(false);
             }
 
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
                 console.log("AuthProvider: Auth state changed:", event, session?.user?.email);
                 if (session?.user) {
                     const profile = await fetchProfile(session.user);
@@ -154,24 +158,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signIn = async (email: string, metadata?: { full_name?: string, company_name?: string }) => {
         setLoading(true);
-        const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`,
-                data: metadata ? {
-                    full_name: metadata.full_name,
-                    company_name: metadata.company_name
-                } : undefined
-            },
-        });
+        try {
+            console.log("AuthContext: Starting direct sign-in for", email);
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/auth/callback`,
+                    data: metadata ? {
+                        full_name: metadata.full_name,
+                        company_name: metadata.company_name
+                    } : undefined
+                },
+            });
 
-        if (error) {
-            console.error("Error signing in:", error);
-            alert("Error login: " + error.message);
-        } else {
-            alert("📩 Revisa tu correo\nTe enviamos un enlace seguro para ingresar a tu cuenta.\nSi no lo ves, revisa spam o promociones.");
+            if (error) {
+                console.error("AuthContext: Direct sign-in error:", error);
+                throw error;
+            }
+            console.log("AuthContext: Sign-in successful (magic link requested)");
+        } catch (error: any) {
+            console.error("AuthContext: Exception in signIn:", error);
+            throw error;
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
+    };
+
+    const checkUser = async (email: string) => {
+        // Simplified check directly against profiles table via client
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', email)
+                .maybeSingle();
+            return { exists: !!data && !error };
+        } catch (err) {
+            console.error("AuthContext: checkUser failed:", err);
+            return { exists: false };
+        }
     };
 
     const signOut = async () => {
@@ -181,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshProfile }}>
+        <AuthContext.Provider value={{ user, loading, signIn, signOut, refreshProfile, checkUser }}>
             {children}
         </AuthContext.Provider>
     );

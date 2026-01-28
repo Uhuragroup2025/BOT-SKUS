@@ -16,6 +16,7 @@ import {
     LayoutDashboard
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { ReferralCard } from "@/components/referral-card";
 
 const items = [
     {
@@ -50,7 +51,7 @@ export function Sidebar() {
     const { user, signOut } = useAuth();
 
     return (
-        <div className="hidden lg:flex w-64 border-r bg-white dark:bg-gray-950 flex-col h-screen fixed left-0 top-0">
+        <div className="hidden lg:flex w-64 border-r bg-white dark:bg-gray-950 flex-col h-screen fixed left-0 top-0 overflow-y-auto">
             <div className="p-6">
                 <div className="mb-6 pl-1">
                     <Link href="/dashboard" className="cursor-pointer">
@@ -75,25 +76,31 @@ export function Sidebar() {
                 </div>
             </div>
 
-            <div className="flex-1 px-4 space-y-2 py-4">
-                {items.map((item) => (
-                    <Link
-                        key={item.url}
-                        href={item.url}
-                        className={cn(
-                            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                            pathname === item.url
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        )}
-                    >
-                        <item.icon size={18} />
-                        {item.title}
-                    </Link>
-                ))}
+            <div className="flex-1 px-4 space-y-2 py-4 flex flex-col">
+                <div className="space-y-2 flex-1">
+                    {items.map((item) => (
+                        <Link
+                            key={item.url}
+                            href={item.url}
+                            className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                                pathname === item.url
+                                    ? "bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            )}
+                        >
+                            <item.icon size={18} />
+                            {item.title}
+                        </Link>
+                    ))}
+                </div>
+
+                <div className="pt-4 pb-2">
+                    <ReferralCard />
+                </div>
             </div>
 
-            <div className="p-4 border-t bg-gray-50/50 dark:bg-gray-900/50 space-y-4">
+            <div className="p-4 border-t bg-gray-50/50 dark:bg-gray-900/50 space-y-4 pb-10">
                 {user?.email?.endsWith("@uhuragroup.com") ? (
                     <div className="space-y-2">
                         <div className="flex justify-between text-xs text-muted-foreground font-medium uppercase tracking-wider">
@@ -137,8 +144,14 @@ export function Sidebar() {
                             </span>
                         </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={signOut} className="h-8 w-8 text-muted-foreground hover:text-red-500">
-                        <LogOut size={16} />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={signOut}
+                        className="h-8 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    >
+                        <LogOut size={16} className="mr-2" />
+                        <span className="text-xs font-semibold">Salir</span>
                     </Button>
                 </div>
             </div>

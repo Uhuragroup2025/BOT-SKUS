@@ -6,14 +6,15 @@ import { redirect } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles, History, CreditCard, Settings } from "lucide-react";
+import { Sparkles, History, CreditCard, Settings, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const { user, loading } = useAuth();
+    const { user, loading, signOut } = useAuth();
     const pathname = usePathname();
 
     useEffect(() => {
@@ -30,7 +31,7 @@ export default function DashboardLayout({
         { label: "Generar", href: "/dashboard/generator", icon: Sparkles },
         { label: "Historial", href: "/dashboard/history", icon: History },
         { label: "Planes", href: "/dashboard/plans", icon: CreditCard },
-        { label: "Ajustes", href: "/dashboard/settings", icon: Settings },
+        { label: "Cerrar", href: "#logout", icon: LogOut, action: true },
     ];
 
     return (
@@ -50,6 +51,18 @@ export default function DashboardLayout({
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname === item.href;
+                        if (item.action) {
+                            return (
+                                <button
+                                    key={item.label}
+                                    onClick={() => signOut()}
+                                    className="flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors text-muted-foreground hover:text-red-500"
+                                >
+                                    <Icon size={20} />
+                                    <span className="text-[10px] font-medium">{item.label}</span>
+                                </button>
+                            );
+                        }
                         return (
                             <Link
                                 key={item.href}

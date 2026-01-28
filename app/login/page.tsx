@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Sparkles, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-    const { signIn } = useAuth();
+    const { signIn, checkUser } = useAuth();
     const [email, setEmail] = useState("");
     const [fullName, setFullName] = useState("");
     const [companyName, setCompanyName] = useState("");
@@ -27,18 +27,32 @@ export default function LoginPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email || cooldown > 0) return;
+        if (!email || cooldown > 0 || loading) return;
+
         setLoading(true);
         try {
+            // Simplified flow: try to sign in/up directly
             const metadata = mode === "signup" ? {
                 full_name: fullName,
                 company_name: companyName
             } : undefined;
 
             await signIn(email, metadata);
-            setCooldown(60); // Inicia cooldown de 60 segundos
-        } catch (error) {
-            console.error("Login attempt failed:", error);
+
+            setCooldown(60);
+            alert("📩 Revisa tu correo\nTe enviamos un enlace seguro.");
+        } catch (error: any) {
+            console.error("Login page: Submit failed:", error);
+            let message = error.message || "Error desconocido";
+
+            // Handle some common errors specifically
+            if (message.includes("rate limit")) {
+                message = "Demasiados intentos. Espera unos minutos.";
+            } else if (JSON.stringify(error) === "{}") {
+                message = "Error de conexión con el servidor. Por favor, intenta de nuevo o revisa tu internet.";
+            }
+
+            alert("Error: " + message);
         } finally {
             setLoading(false);
         }
