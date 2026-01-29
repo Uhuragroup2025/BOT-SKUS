@@ -15,11 +15,11 @@ export async function GET(request: Request) {
             const isLocalEnv = process.env.NODE_ENV === 'development'
 
             if (isLocalEnv) {
-                return NextResponse.redirect(`${origin}${next}`)
+                return NextResponse.redirect(new URL(next, origin).toString())
             } else if (forwardedHost) {
                 return NextResponse.redirect(`https://${forwardedHost}${next}`)
             } else {
-                return NextResponse.redirect(`${origin}${next}`)
+                return NextResponse.redirect(new URL(next, origin).toString())
             }
         }
 
@@ -27,5 +27,5 @@ export async function GET(request: Request) {
     }
 
     // Redirect to login with error instead of non-existent page
-    return NextResponse.redirect(`${origin}/login?error=auth-code-error`)
+    return NextResponse.redirect(new URL('/login?error=auth-code-error', origin).toString())
 }

@@ -31,27 +31,12 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // Optimization: Check if we have a Supabase auth cookie at all
-    // This avoids a network call for most unauthenticated requests
-    const hasAuthCookie = request.cookies.getAll().some(cookie =>
-        cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
-    )
-
     const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
     const isLoginRoute = request.nextUrl.pathname === '/login'
     const isRootRoute = request.nextUrl.pathname === '/'
 
-    // If it's a protected route and we don't even have a cookie, redirect immediately
-    if (isProtectedRoute && !hasAuthCookie) {
-        return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-    // Only call getUser if we have a cookie or if we need to know for sure (root/login)
-    let user = null
-    if (hasAuthCookie || isRootRoute || isLoginRoute) {
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        user = authUser
-    }
+    // Get the user from Supabase. This will also handle cookie refreshing.
+    const { data: { user } } = await supabase.auth.getUser()
 
     // 1. If user is at root (/), redirect appropriately
     if (isRootRoute) {
