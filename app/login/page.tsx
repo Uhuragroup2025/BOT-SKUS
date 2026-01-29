@@ -31,6 +31,24 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
+            // First, check if user exists
+            const { exists } = await checkUser(email);
+
+            if (!exists && mode === "login") {
+                // User doesn't exist, switch to signup but don't submit yet
+                setMode("signup");
+                alert("✨ Parece que eres nuevo\nPor favor completa tus datos para crear tu cuenta.");
+                setLoading(false);
+                return;
+            }
+
+            if (exists && mode === "signup") {
+                // User exists but is in signup mode, switch to login
+                setMode("login");
+                alert("👋 Ya tienes cuenta\nTe enviaremos un enlace de acceso directo.");
+                // Continue with sign in as it's just a login now
+            }
+
             // Simplified flow: try to sign in/up directly
             const metadata = mode === "signup" ? {
                 full_name: fullName,
