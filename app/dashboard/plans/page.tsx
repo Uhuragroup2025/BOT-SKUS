@@ -15,7 +15,7 @@ export default function PlansPage() {
         <div className="space-y-8 pb-10 px-0 sm:px-4">
             <div className="text-center space-y-2 max-w-2xl mx-auto">
                 <h1 className="text-2xl md:text-3xl font-bold tracking-tight px-4 sm:px-0">Elige el plan perfecto para ti</h1>
-                <p className="text-muted-foreground text-base md:text-lg px-6 sm:px-0">“Empieza gratis. Solo pagas cuando lo necesitas.”</p>
+                <p className="text-muted-foreground text-base md:text-lg px-6 sm:px-0">Empieza gratis. Solo pagas cuando lo necesitas.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
@@ -38,7 +38,7 @@ export default function PlansPage() {
                         <div className="text-sm font-medium">5 fichas totales</div>
                         <ul className="space-y-2 text-sm text-muted-foreground pt-4">
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> 1 usuario</li>
-                            <li className="flex items-center gap-2 font-medium text-destructive/80"><X className="h-4 w-4" /> Sin descarga PDF/CSV</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Descarga PDF/CSV</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Soporte básico</li>
                         </ul>
                     </CardContent>

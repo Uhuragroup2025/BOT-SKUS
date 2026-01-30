@@ -265,7 +265,7 @@ export default function GeneratorPage() {
                                 <p className="text-sm text-muted-foreground">Completa los detalles o usa la extracción inteligente.</p>
                             </div>
                             <div className="bg-primary/5 p-2 rounded-lg border border-primary/10">
-                                <Label className="text-[10px] uppercase font-bold text-primary block mb-1">Tu Créditos</Label>
+                                <Label className="text-[10px] uppercase font-bold text-primary block mb-1">Tus créditos</Label>
                                 <div className="text-lg font-bold text-center">{credits}</div>
                             </div>
                         </div>
