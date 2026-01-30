@@ -1,6 +1,8 @@
 import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+const pdf = require("pdf-parse");
+
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -13,28 +15,48 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
-        const { text, image } = await req.json();
+        const { text, image, fileType } = await req.json();
+        let extractedText = text;
+
+        if (image && image.startsWith("data:application/pdf")) {
+            // Processing PDF
+            const base64Data = image.split(",")[1];
+            const buffer = Buffer.from(base64Data, "base64");
+            const pdfData = await pdf(buffer);
+            extractedText = pdfData.text;
+        }
+
+        const systemPrompt = `Eres un experto en extracción de datos estructurados de productos para ecommerce. 
+        Analiza el input (texto o imagen) y determina si contiene información sobre un producto real (etiqueta, ficha técnica, descripción comercial).
+        
+        Si el input NO es sobre un producto (ej: paisajes, personas, fotos aleatorias, texto sin sentido sobre productos), responde:
+        {
+            "isValidProduct": false,
+            "rejectionReason": "El archivo o texto no parece contener información técnica o comercial de un producto. Por favor sube una imagen de la etiqueta, ficha técnica o descripción del producto."
+        }
+        
+        Si el input SI es sobre un producto, extrae los datos en este formato JSON:
+        {
+            "isValidProduct": true,
+            "brand": "string",
+            "model": "string",
+            "presentation": "string (ej: 500ml, Pack de 2)",
+            "material": "string",
+            "mainUse": "string",
+            "benefits": ["string"],
+            "certification": "string"
+        }
+        Si no encuentras un dato específico del producto, pon null en ese campo.`;
 
         const messages: any[] = [
             {
                 role: "system",
-                content: `Eres un experto en extracción de datos estructurados de productos. 
-                Analiza el input (texto o imagen) y extrae la siguiente información en formato JSON:
-                {
-                    "brand": "string",
-                    "model": "string",
-                    "presentation": "string (ej: 500ml, Pack de 2)",
-                    "material": "string",
-                    "mainUse": "string",
-                    "benefits": ["string"],
-                    "certification": "string"
-                }
-                Si no encuentras un dato, pon null.`
+                content: systemPrompt
             }
         ];
 
-        if (text) {
-            messages.push({ role: "user", content: `Extrae datos de este texto: ${text}` });
+        if (extractedText) {
+            messages.push({ role: "user", content: `Extrae datos de este texto: ${extractedText}` });
         } else if (image) {
             messages.push({
                 role: "user",
@@ -52,10 +74,19 @@ export async function POST(req: Request) {
         });
 
         const content = completion.choices[0].message.content;
-        return NextResponse.json(JSON.parse(content || "{}"));
+        const parsedContent = JSON.parse(content || "{}");
+
+        if (parsedContent.isValidProduct === false) {
+            return NextResponse.json({
+                error: parsedContent.rejectionReason || "El archivo no parece ser un producto válido."
+            }, { status: 400 });
+        }
+
+        return NextResponse.json(parsedContent);
 
     } catch (error) {
         console.error("Extraction error:", error);
-        return NextResponse.json({ error: "Failed to extract data" }, { status: 500 });
+        return NextResponse.json({ error: "Error al extraer datos. El archivo podría estar dañado o no ser compatible." }, { status: 500 });
     }
 }
+

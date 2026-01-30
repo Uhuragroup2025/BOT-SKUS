@@ -136,26 +136,31 @@ export default function GeneratorPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text, image }),
             });
-            if (!response.ok) throw new Error("Extraction failed");
-            const data = await response.json();
 
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || "Error al extraer los datos.");
+            }
+
+            const data = await response.json();
             setExtractionData(data);
             setShowReviewModal(true);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError("Error al extraer datos. Intenta ingresarlos manualmente.");
+            setError(err.message || "Error al extraer datos. Intenta ingresarlos manualmente.");
         } finally {
             setExtracting(false);
         }
     };
 
+
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validar que sea imagen
-        if (!file.type.startsWith('image/')) {
-            setError("Por favor selecciona un archivo de imagen.");
+        // Validar que sea imagen o PDF
+        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+            setError("Por favor selecciona un archivo de imagen o PDF.");
             return;
         }
 
@@ -166,6 +171,7 @@ export default function GeneratorPage() {
         };
         reader.readAsDataURL(file);
     };
+
 
     const handleConfirmExtraction = () => {
         if (extractionData) {
@@ -304,7 +310,7 @@ export default function GeneratorPage() {
                                         type="file"
                                         id="file-upload"
                                         className="hidden"
-                                        accept="image/*"
+                                        accept="image/*,application/pdf"
                                         onChange={handleFileChange}
                                         disabled={extracting}
                                     />
@@ -317,8 +323,9 @@ export default function GeneratorPage() {
                                         type="button"
                                     >
                                         <FileText className="w-4 h-4" />
-                                        Subir imagen
+                                        Subir imagen / PDF
                                     </Button>
+
                                 </div>
                             </div>
                         </div>
