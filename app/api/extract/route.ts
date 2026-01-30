@@ -1,7 +1,7 @@
 import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-const pdf = require("pdf-parse");
+
 
 
 const openai = new OpenAI({
@@ -15,15 +15,27 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
-        const { text, image, fileType } = await req.json();
+        const body = await req.json();
+        const { text, image } = body;
+
+        console.log("Extraction Request Received", { hasText: !!text, hasImage: !!image, imageStart: image?.substring(0, 30) });
+
         let extractedText = text;
 
         if (image && image.startsWith("data:application/pdf")) {
-            // Processing PDF
-            const base64Data = image.split(",")[1];
-            const buffer = Buffer.from(base64Data, "base64");
-            const pdfData = await pdf(buffer);
-            extractedText = pdfData.text;
+            console.log("Processing PDF...");
+            try {
+                // Dynamically import pdf-parse to avoid top-level issues
+                const pdf = require("pdf-parse");
+                const base64Data = image.split(",")[1];
+                const buffer = Buffer.from(base64Data, "base64");
+                const pdfData = await pdf(buffer);
+                extractedText = pdfData.text;
+                console.log("PDF Text extracted length:", extractedText.length);
+            } catch (pdfError: any) {
+                console.error("PDF Parsing Error:", pdfError);
+                return NextResponse.json({ error: "Error al leer el PDF. Asegúrate de que no esté corrupto." }, { status: 400 });
+            }
         }
 
         const systemPrompt = `Eres un experto en extracción de datos estructurados de productos para ecommerce. 
@@ -58,6 +70,7 @@ export async function POST(req: Request) {
         if (extractedText) {
             messages.push({ role: "user", content: `Extrae datos de este texto: ${extractedText}` });
         } else if (image) {
+            // For images (not PDF)
             messages.push({
                 role: "user",
                 content: [
@@ -74,6 +87,8 @@ export async function POST(req: Request) {
         });
 
         const content = completion.choices[0].message.content;
+        console.log("OpenAI Response:", content?.substring(0, 100) + "...");
+
         const parsedContent = JSON.parse(content || "{}");
 
         if (parsedContent.isValidProduct === false) {
@@ -84,9 +99,9 @@ export async function POST(req: Request) {
 
         return NextResponse.json(parsedContent);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Extraction error:", error);
-        return NextResponse.json({ error: "Error al extraer datos. El archivo podría estar dañado o no ser compatible." }, { status: 500 });
+        return NextResponse.json({ error: error.message || "Error interno al procesar la solicitud." }, { status: 500 });
     }
 }
 
