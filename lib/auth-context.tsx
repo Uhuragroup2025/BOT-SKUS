@@ -98,9 +98,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.log("AuthProvider: Key Prefix:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 15));
 
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                console.log("AuthProvider: getSession result:", session ? "Session found" : "No session", "Error:", sessionError);
 
                 if (sessionError) {
                     console.error("AuthProvider: Error getting session:", sessionError);
+                }
+
+                if (!session && !sessionError) {
+                    console.warn("AuthProvider: No session and no error. Checking current user...");
+                    const { data: { user: currentUser } } = await supabase.auth.getUser();
+                    console.log("AuthProvider: getUser fallback result:", currentUser ? "User found" : "No user");
                 }
 
                 if (session?.user) {

@@ -11,16 +11,9 @@ export async function GET(request: Request) {
         const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
-            const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
-            const isLocalEnv = process.env.NODE_ENV === 'development'
-
-            if (isLocalEnv) {
-                return NextResponse.redirect(new URL(next, origin).toString())
-            } else if (forwardedHost) {
-                return NextResponse.redirect(`https://${forwardedHost}${next}`)
-            } else {
-                return NextResponse.redirect(new URL(next, origin).toString())
-            }
+            // In local development, origin might be 'http://localhost:3000'
+            const redirectUrl = new URL(next, origin);
+            return NextResponse.redirect(redirectUrl.toString());
         }
 
         console.error('Auth callback error:', error)

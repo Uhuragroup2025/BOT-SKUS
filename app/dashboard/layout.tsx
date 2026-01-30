@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context";
 import { Sidebar } from "@/components/sidebar";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,13 +15,14 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const { user, loading, signOut } = useAuth();
+    const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
         if (!loading && !user) {
-            redirect("/login");
+            router.replace("/login");
         }
-    }, [user, loading]);
+    }, [user, loading, router]);
 
     if (loading) {
         return <div className="h-screen w-full flex items-center justify-center">Cargando...</div>;
