@@ -30,7 +30,12 @@ interface GeneratedContent {
     aiRecommendation: string;
     score: number;
     imageAlt: string[];
-    visualPack?: {
+    imagePrompts?: {
+        id: number;
+        title: string;
+        prompt: string;
+    }[];
+    visualPack?: { // Mantener compatibilidad si es necesario, pero idealmente deprecado
         id: number;
         title: string;
         visual: string;
@@ -54,6 +59,11 @@ export default function GeneratorPage() {
     const [extractionData, setExtractionData] = useState<any>(null);
     const [showReviewModal, setShowReviewModal] = useState(false);
 
+    // Image Generation State
+    // Stores the generated image (base64) or null if not generated yet.
+    // Key: prompt id. Value: base64 string or 'loading' or 'error'.
+    const [imageStates, setImageStates] = useState<Record<number, { status: 'idle' | 'loading' | 'success' | 'error', url?: string }>>({});
+
     // Form States
     const [productName, setProductName] = useState("");
     const [features, setFeatures] = useState("");
@@ -72,9 +82,35 @@ export default function GeneratorPage() {
 
     const credits = user?.credits ?? 0;
 
+    const generateOneImage = async (id: number, prompt: string) => {
+        setImageStates(prev => ({ ...prev, [id]: { status: 'loading' } }));
+        try {
+            const response = await fetch("/api/generate-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt }),
+            });
+
+            if (!response.ok) throw new Error("Failed to generate image");
+
+            const data = await response.json();
+            if (data.image) {
+                setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: data.image } }));
+            } else {
+                throw new Error("No image data");
+            }
+
+        } catch (err) {
+            console.error(`Error generating image ${id}:`, err);
+            setImageStates(prev => ({ ...prev, [id]: { status: 'error' } }));
+        }
+    };
+
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setResult(null);
+        setImageStates({}); // Reset images
 
         if (credits <= 0) {
             setError("No tienes créditos suficientes. Por favor, adquiere un plan.");
@@ -116,7 +152,14 @@ export default function GeneratorPage() {
 
             const data = await response.json();
             setResult(data);
-            setLoading(false); // Reset loading immediately after getting result
+            setLoading(false);
+
+            // Trigger Image Generation in background for each prompt
+            if (data.imagePrompts && Array.isArray(data.imagePrompts)) {
+                data.imagePrompts.forEach((item: any) => {
+                    generateOneImage(item.id, item.prompt);
+                });
+            }
 
             // Refresh credits in background
             refreshProfile().catch(err => console.error("Error refreshing profile:", err));
@@ -500,52 +543,82 @@ export default function GeneratorPage() {
                             </CardContent>
                         </Card>
 
-                        {/* VISUAL PACK */}
-                        {result.visualPack && (
+                        {/* VISUAL PACK / GENERATED IMAGES */}
+                        {result.imagePrompts && (
                             <div className="space-y-4">
                                 <h3 className="text-lg font-bold flex items-center gap-2">
                                     <Sparkles className="w-5 h-5 text-primary" />
-                                    Visual Pack (5 imágenes sugeridas)
+                                    Generación de Imágenes (Beta)
                                 </h3>
-                                <div className="space-y-4">
-                                    {result.visualPack.map((img) => (
-                                        <Card key={img.id} className="overflow-hidden border-primary/10">
-                                            <div className="bg-primary/5 px-4 py-2 border-b border-primary/10 flex justify-between items-center">
-                                                <span className="font-bold text-sm">Imagen {img.id}: {img.title}</span>
-                                            </div>
-                                            <CardContent className="p-4 space-y-3">
-                                                <div>
-                                                    <Label className="text-[10px] uppercase font-bold opacity-50">Instrucción Visual</Label>
-                                                    <p className="text-sm italic">{img.visual}</p>
+                                <div className="space-y-8">
+                                    {result.imagePrompts.map((img: any) => {
+                                        const state = imageStates[img.id] || { status: 'idle' };
+                                        return (
+                                            <Card key={img.id} className="overflow-hidden border-primary/10">
+                                                <div className="bg-primary/5 px-4 py-2 border-b border-primary/10 flex justify-between items-center">
+                                                    <span className="font-bold text-sm">Imagen {img.id}: {img.title}</span>
+                                                    <span className="text-[10px] uppercase opacity-70 border px-1 rounded bg-white dark:bg-black">
+                                                        {state.status === 'success' ? 'Generada' : state.status === 'loading' ? 'Creando...' : 'Pendiente'}
+                                                    </span>
                                                 </div>
-                                                <div className="bg-gray-50 dark:bg-gray-950 p-3 rounded-lg border">
-                                                    <Label className="text-[10px] uppercase font-bold opacity-50 block mb-2">Copy Sugerido</Label>
-                                                    {img.copy.headline && <p className="font-bold text-primary">{img.copy.headline}</p>}
-                                                    {img.copy.subheadline && <p className="text-sm font-medium">{img.copy.subheadline}</p>}
-                                                    {img.copy.text && <p className="text-sm">{img.copy.text}</p>}
-                                                    {img.copy.bullets && (
-                                                        <ul className="list-disc pl-4 text-xs mt-2 space-y-1">
-                                                            {img.copy.bullets.map((b, idx) => <li key={idx}>{b}</li>)}
-                                                        </ul>
-                                                    )}
-                                                    {img.copy.seals && (
-                                                        <div className="flex flex-wrap gap-2 mt-2">
-                                                            {img.copy.seals.map((s, idx) => (
-                                                                <span key={idx} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">
-                                                                    {s}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                <div className="grid grid-cols-1 md:grid-cols-2">
+                                                    {/* PROMPT COLUMN */}
+                                                    <div className="p-4 border-r border-primary/10 bg-gray-50/50 dark:bg-black/20">
+                                                        <Label className="text-[10px] uppercase font-bold opacity-50 mb-2 block">Prompt Generado</Label>
+                                                        <p className="text-xs italic text-muted-foreground whitespace-pre-wrap">{img.prompt}</p>
+                                                        <Button variant="ghost" size="sm" className="mt-2 h-6 text-xs gap-1" onClick={() => navigator.clipboard.writeText(img.prompt)}>
+                                                            <Copy className="w-3 h-3" /> Copiar Prompt
+                                                        </Button>
+                                                    </div>
+
+                                                    {/* IMAGE RESULT COLUMN */}
+                                                    <div className="p-4 flex items-center justify-center min-h-[200px] bg-white dark:bg-black relative">
+                                                        {state.status === 'success' && state.url ? (
+                                                            <div className="relative group w-full h-full">
+                                                                <img src={state.url} alt={img.title} className="w-full h-auto rounded shadow-sm object-cover" />
+                                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                                    <Button size="sm" variant="secondary" onClick={() => window.open(state.url, '_blank')}>
+                                                                        Ver
+                                                                    </Button>
+                                                                    <Button size="sm" variant="secondary" onClick={() => {
+                                                                        const a = document.createElement('a');
+                                                                        a.href = state.url!;
+                                                                        a.download = `imagen-${img.id}-${img.title}.png`;
+                                                                        a.click();
+                                                                    }}>
+                                                                        Descargar
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : state.status === 'loading' ? (
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                                                                <span className="text-xs text-muted-foreground animate-pulse">Imaginando...</span>
+                                                            </div>
+                                                        ) : state.status === 'error' ? (
+                                                            <div className="text-center">
+                                                                <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                                                                <span className="text-xs text-red-500 block">Error al generar</span>
+                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt)}>
+                                                                    Reintentar
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center text-muted-foreground opacity-50">
+                                                                <Sparkles className="w-8 h-8 mx-auto mb-2" />
+                                                                <span className="text-xs">Esperando turno...</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
 
-                        <div className="border-t pt-8 mt-8 space-y-6 disabled">
+                        <div className="border-t pt-8 mt-8 space-y-6">
                             <h3 className="text-lg font-bold">Ficha de Producto Estructurada</h3>
                             <ResultBlock label="1. Título SEO" content={result.seoTitle} limit={60} />
                             <ResultBlock label="2. Descripción corta" content={result.shortDescription} limit={150} />
