@@ -157,7 +157,7 @@ export default function GeneratorPage() {
             // Trigger Image Generation in background for each prompt
             if (data.imagePrompts && Array.isArray(data.imagePrompts)) {
                 data.imagePrompts.forEach((item: any) => {
-                    generateOneImage(item.id, item.prompt);
+                    generateOneImage(item.id, item.prompt, referenceImage);
                 });
             }
 
@@ -197,6 +197,9 @@ export default function GeneratorPage() {
     };
 
 
+    // State for the reference image (Base64)
+    const [referenceImage, setReferenceImage] = useState<string | null>(null);
+
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -209,7 +212,29 @@ export default function GeneratorPage() {
 
         const reader = new FileReader();
         reader.onloadend = async () => {
-            const base64 = reader.result as string;
+            let base64 = reader.result as string;
+
+            // Fix for AVIF/HEIC/WEBP: Convert to JPEG/PNG if needed to ensure compatibility
+            // functionality to draw to canvas and export as jpeg
+            if (file.type === 'image/avif' || file.type === 'image/webp' || file.type === 'image/heic') {
+                try {
+                    const img = new Image();
+                    img.src = base64;
+                    await new Promise((resolve) => { img.onload = resolve; });
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0);
+                    base64 = canvas.toDataURL('image/jpeg', 0.8); // Convert to JPEG
+                } catch (conversionErr) {
+                    console.error("Error converting image:", conversionErr);
+                    // Fallback to original if conversion fails, but warn
+                }
+            }
+
+            setReferenceImage(base64); // Store for generation
             await handleExtract(undefined, base64);
         };
         reader.readAsDataURL(file);
@@ -599,7 +624,7 @@ export default function GeneratorPage() {
                                                             <div className="text-center">
                                                                 <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
                                                                 <span className="text-xs text-red-500 block">Error al generar</span>
-                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt)}>
+                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt, referenceImage)}>
                                                                     Reintentar
                                                                 </Button>
                                                             </div>
