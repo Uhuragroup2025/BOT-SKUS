@@ -1,11 +1,11 @@
-import { OpenAI } from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { constructUserPrompt, GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
 import { createClient } from "@/lib/supabase/server";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize Gemini
+// Ensure you have GEMINI_API_KEY in your env variables
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: Request) {
     const supabase = await createClient();
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
         const body = await req.json();
         const {
             productName, features, category, channel, tone,
-            type, brand, model, presentation, material, mainUse, benefits, certification
+            type, brand, model: productModel, presentation, material, mainUse, benefits, certification
         } = body;
 
         if (!productName || !features) {
@@ -57,6 +57,16 @@ export async function POST(req: Request) {
         }
 
         // 3. Generate Content
+        // Note: Gemini doesn't always strictly adhere to system prompts in the same way as OpenAI in `chat` struct,
+        // but `systemInstruction` is available in newer models or we can prepend it.
+        // For 1.5 Pro, we can pass systemInstruction to getGenerativeModel.
+
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-pro",
+            systemInstruction: GENERATION_SYSTEM_PROMPT,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
         const userPrompt = constructUserPrompt({
             name: productName,
             features,
@@ -65,7 +75,7 @@ export async function POST(req: Request) {
             tone,
             type,
             brand,
-            model,
+            model: productModel,
             presentation,
             material,
             mainUse,
@@ -73,16 +83,9 @@ export async function POST(req: Request) {
             certification
         });
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: GENERATION_SYSTEM_PROMPT },
-                { role: "user", content: userPrompt },
-            ],
-            response_format: { type: "json_object" },
-        });
-
-        const content = completion.choices[0].message.content;
+        const result = await model.generateContent(userPrompt);
+        const response = await result.response;
+        const content = response.text();
 
         if (!content) {
             throw new Error("No content generated");

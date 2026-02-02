@@ -1,12 +1,8 @@
-import { OpenAI } from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: Request) {
     const supabase = await createClient();
@@ -38,6 +34,7 @@ export async function POST(req: Request) {
             }
         }
 
+        // Prepare System Prompt
         const systemPrompt = `Eres un experto en extracción de datos estructurados de productos para ecommerce. 
         Analiza el input (texto o imagen) y determina si contiene información sobre un producto real (etiqueta, ficha técnica, descripción comercial).
         
@@ -60,34 +57,44 @@ export async function POST(req: Request) {
         }
         Si no encuentras un dato específico del producto, pon null en ese campo.`;
 
-        const messages: any[] = [
-            {
-                role: "system",
-                content: systemPrompt
-            }
-        ];
-
-        if (extractedText) {
-            messages.push({ role: "user", content: `Extrae datos de este texto: ${extractedText}` });
-        } else if (image) {
-            // For images (not PDF)
-            messages.push({
-                role: "user",
-                content: [
-                    { type: "text", text: "Extrae datos de esta imagen de producto." },
-                    { type: "image_url", image_url: { url: image } }
-                ]
-            });
-        }
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages,
-            response_format: { type: "json_object" }
+        const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-pro",
+            systemInstruction: systemPrompt,
+            generationConfig: { responseMimeType: "application/json" }
         });
 
-        const content = completion.choices[0].message.content;
-        console.log("OpenAI Response:", content?.substring(0, 100) + "...");
+        let result;
+
+        if (extractedText) {
+            result = await model.generateContent(`Extrae datos de este texto: ${extractedText}`);
+        } else if (image) {
+            // For images (non-PDF)
+            // image format: "data:image/jpeg;base64,..."
+            // Gemini needs just the base64 part and the mimeType
+            const [meta, base64Data] = image.split(",");
+            const mimeType = meta.split(":")[1].split(";")[0];
+
+            result = await model.generateContent([
+                { text: "Extrae datos de esta imagen de producto." },
+                {
+                    inlineData: {
+                        mimeType: mimeType,
+                        data: base64Data
+                    }
+                }
+            ]);
+        } else {
+            return NextResponse.json({ error: "No input provided" }, { status: 400 });
+        }
+
+        const response = await result.response;
+        let content = response.text();
+        console.log("Gemini Response:", content?.substring(0, 100) + "...");
+
+        // Clean potentially markdown wrapped JSON from Gemini (redundant if using responseMimeType: "application/json" but safe)
+        if (content.startsWith("```json")) {
+            content = content.replace(/^```json\n/, "").replace(/\n```$/, "");
+        }
 
         const parsedContent = JSON.parse(content || "{}");
 
