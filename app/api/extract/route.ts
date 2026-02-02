@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         Si no encuentras un dato específico del producto, pon null en ese campo.`;
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-pro",
+            model: "gemini-1.5-flash",
             systemInstruction: systemPrompt,
             generationConfig: { responseMimeType: "application/json" }
         });
