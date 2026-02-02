@@ -62,7 +62,7 @@ export async function POST(req: Request) {
         // For 1.5 Pro, we can pass systemInstruction to getGenerativeModel.
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-flash-latest",
             systemInstruction: GENERATION_SYSTEM_PROMPT,
             generationConfig: { responseMimeType: "application/json" }
         });
