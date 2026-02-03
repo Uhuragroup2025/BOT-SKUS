@@ -66,7 +66,11 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error("Generate Image Error:", error);
+        console.error("------------------------------------------------");
+        console.error("Generate Image Error Details:");
+        console.error("Message:", error.message);
+        console.error("GoogleGenerativeAIError:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error("------------------------------------------------");
 
         // Handle Quota errors specifically to give better feedback
         if (error.message?.includes("429") || error.message?.includes("quota")) {

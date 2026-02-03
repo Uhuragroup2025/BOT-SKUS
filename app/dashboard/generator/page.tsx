@@ -59,31 +59,15 @@ export default function GeneratorPage() {
     const [extractionData, setExtractionData] = useState<any>(null);
     const [showReviewModal, setShowReviewModal] = useState(false);
 
-    // Image Generation State
-    // Stores the generated image (base64) or null if not generated yet.
     // Key: prompt id. Value: base64 string or 'loading' or 'error'.
-    const [imageStates, setImageStates] = useState<Record<number, { status: 'idle' | 'loading' | 'success' | 'error', url?: string }>>({});
+    const [imageStates, setImageStates] = useState<Record<number, { status: 'idle' | 'loading' | 'success' | 'error', url?: string, error?: string }>>({});
 
-    // Form States
-    const [productName, setProductName] = useState("");
-    const [features, setFeatures] = useState("");
-    const [category, setCategory] = useState("");
-    const [channel, setChannel] = useState("ecommerce");
-    const [tone, setTone] = useState("comercial");
-
-    // New Structured Fields
-    const [productType, setProductType] = useState("Belleza & Cuidado Personal");
-    const [brand, setBrand] = useState("");
-    const [model, setModel] = useState("");
-    const [presentation, setPresentation] = useState("");
-    const [material, setMaterial] = useState("");
-    const [mainUse, setMainUse] = useState("");
-    const [certification, setCertification] = useState("");
+    // ... (other states)
 
     const credits = user?.credits ?? 0;
 
     const generateOneImage = async (id: number, prompt: string, refImage: string | null) => {
-        setImageStates(prev => ({ ...prev, [id]: { status: 'loading' } }));
+        setImageStates(prev => ({ ...prev, [id]: { status: 'loading', error: undefined } }));
         try {
             const response = await fetch("/api/generate-image", {
                 method: "POST",
@@ -91,18 +75,21 @@ export default function GeneratorPage() {
                 body: JSON.stringify({ prompt, referenceImage: refImage }),
             });
 
-            if (!response.ok) throw new Error("Failed to generate image");
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `Error ${response.status}: Failed to generate image`);
+            }
 
             const data = await response.json();
             if (data.image) {
                 setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: data.image } }));
             } else {
-                throw new Error("No image data");
+                throw new Error("No image data received");
             }
 
-        } catch (err) {
+        } catch (err: any) {
             console.error(`Error generating image ${id}:`, err);
-            setImageStates(prev => ({ ...prev, [id]: { status: 'error' } }));
+            setImageStates(prev => ({ ...prev, [id]: { status: 'error', error: err.message } }));
         }
     };
 
@@ -621,9 +608,12 @@ export default function GeneratorPage() {
                                                                 <span className="text-xs text-muted-foreground animate-pulse">Imaginando...</span>
                                                             </div>
                                                         ) : state.status === 'error' ? (
-                                                            <div className="text-center">
+                                                            <div className="text-center p-2">
                                                                 <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                                                                <span className="text-xs text-red-500 block">Error al generar</span>
+                                                                <span className="text-xs text-red-500 block font-bold">Error al generar</span>
+                                                                {state.error && (
+                                                                    <p className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words leading-tight">{state.error}</p>
+                                                                )}
                                                                 <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt, referenceImage)}>
                                                                     Reintentar
                                                                 </Button>
