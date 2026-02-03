@@ -62,7 +62,21 @@ export default function GeneratorPage() {
     // Key: prompt id. Value: base64 string or 'loading' or 'error'.
     const [imageStates, setImageStates] = useState<Record<number, { status: 'idle' | 'loading' | 'success' | 'error', url?: string, error?: string }>>({});
 
-    // ... (other states)
+    // Form States
+    const [productName, setProductName] = useState("");
+    const [features, setFeatures] = useState("");
+    const [category, setCategory] = useState("");
+    const [channel, setChannel] = useState("ecommerce");
+    const [tone, setTone] = useState("comercial");
+
+    // New Structured Fields
+    const [productType, setProductType] = useState("Belleza & Cuidado Personal");
+    const [brand, setBrand] = useState("");
+    const [model, setModel] = useState("");
+    const [presentation, setPresentation] = useState("");
+    const [material, setMaterial] = useState("");
+    const [mainUse, setMainUse] = useState("");
+    const [certification, setCertification] = useState("");
 
     const credits = user?.credits ?? 0;
 
