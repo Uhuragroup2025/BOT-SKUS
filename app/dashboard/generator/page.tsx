@@ -82,13 +82,13 @@ export default function GeneratorPage() {
 
     const credits = user?.credits ?? 0;
 
-    const generateOneImage = async (id: number, prompt: string) => {
+    const generateOneImage = async (id: number, prompt: string, refImage: string | null) => {
         setImageStates(prev => ({ ...prev, [id]: { status: 'loading' } }));
         try {
             const response = await fetch("/api/generate-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt }),
+                body: JSON.stringify({ prompt, referenceImage: refImage }),
             });
 
             if (!response.ok) throw new Error("Failed to generate image");
