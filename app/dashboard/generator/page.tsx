@@ -626,7 +626,7 @@ export default function GeneratorPage() {
                                                                 <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
                                                                 <span className="text-xs text-red-500 block font-bold">Error al generar</span>
                                                                 {state.error && (
-                                                                    <p className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words leading-tight">{state.error}</p>
+                                                                    <p className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words leading-tight whitespace-pre-wrap">{state.error}</p>
                                                                 )}
                                                                 <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt, referenceImage)}>
                                                                     Reintentar

@@ -74,7 +74,7 @@ export async function POST(req: Request) {
 
         if (error.message?.includes("429") || error.message?.includes("quota")) {
             return NextResponse.json(
-                { error: "⚠️ CRÉDITO AGOTADO: No se pueden generar más imágenes. ¡Dile al gerente que hay que pagar la API de Google! 💸" },
+                { error: "⚠️ Ups… límite de imágenes alcanzado\n\nEstoy conectado a Gemini y puedo generar textos sin problema ✍️\nPero para crear imágenes uso potencia gráfica y eso funciona con créditos de Google Cloud por demanda 🎨💸\n\nRecargamos y sigo creando 🚀✨" },
                 { status: 429 }
             );
         }
