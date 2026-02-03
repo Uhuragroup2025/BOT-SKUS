@@ -72,10 +72,9 @@ export async function POST(req: Request) {
         console.error("GoogleGenerativeAIError:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         console.error("------------------------------------------------");
 
-        // Handle Quota errors specifically to give better feedback
         if (error.message?.includes("429") || error.message?.includes("quota")) {
             return NextResponse.json(
-                { error: "Quota exceeded for Image Generation (Gemini 2.0). Please upgrade plan." },
+                { error: "⚠️ CRÉDITO AGOTADO: No se pueden generar más imágenes. ¡Dile al gerente que hay que pagar la API de Google! 💸" },
                 { status: 429 }
             );
         }
