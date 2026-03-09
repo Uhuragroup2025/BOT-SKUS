@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import NextImage from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +19,63 @@ import {
     DialogDescription
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
+import { MasterSKU } from "@/lib/types";
+
+// Helper for default state
+const initialSKUMaster: Partial<MasterSKU> = {
+    product_identity: {
+        brand: "",
+        product_name: "",
+        product_line: "",
+        category: "",
+        subcategory: "",
+        product_type: "Belleza & Cuidado Personal",
+        sku_code: null,
+        presentations: []
+    },
+    physical_attributes: {
+        material: "",
+        format: "",
+        color: "",
+        packaging_type: "",
+        dimensions: null,
+        weight: null,
+        texture: "",
+        shape_constraints: []
+    },
+    functional_attributes: {
+        main_use: [],
+        secondary_use: [],
+        benefits_core: [],
+        differentiators: [],
+        certifications: [],
+        warnings: [],
+        instructions: []
+    },
+    targeting: {
+        target_audience: [],
+        skin_type: [],
+        usage_context: [],
+        tone: "comercial"
+    },
+    marketplace_metadata: {
+        channel: "ecommerce",
+        country: "Colombia",
+        listing_title_max_length: 60,
+        bullet_count: 4,
+        requires_white_background: true,
+        requires_structured_attributes: true
+    },
+    ai_constraints: {
+        product_lock: true,
+        allow_packaging_redesign: false,
+        allow_text_regeneration: false,
+        allow_logo_changes: false,
+        allow_background_generation: true,
+        allow_lighting_adjustment: true,
+        allow_scene_context: true
+    }
+};
 
 interface GeneratedContent {
     seoTitle: string;
@@ -56,42 +114,32 @@ export default function GeneratorPage() {
     const [extracting, setExtracting] = useState(false);
     const [result, setResult] = useState<GeneratedContent | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [extractionData, setExtractionData] = useState<any>(null);
+    const [skuMaster, setSkuMaster] = useState<Partial<MasterSKU>>(initialSKUMaster);
+    const [features, setFeatures] = useState("");
+    const [extractionData, setExtractionData] = useState<Partial<MasterSKU> | null>(null);
     const [showReviewModal, setShowReviewModal] = useState(false);
 
     // Key: prompt id. Value: base64 string or 'loading' or 'error'.
     const [imageStates, setImageStates] = useState<Record<number, { status: 'idle' | 'loading' | 'success' | 'error', url?: string, error?: string }>>({});
-
-    // Form States
-    const [productName, setProductName] = useState("");
-    const [features, setFeatures] = useState("");
-    const [category, setCategory] = useState("");
-    const [channel, setChannel] = useState("ecommerce");
-    const [tone, setTone] = useState("comercial");
-
-    // New Structured Fields
-    const [productType, setProductType] = useState("Belleza & Cuidado Personal");
-    const [brand, setBrand] = useState("");
-    const [model, setModel] = useState("");
-    const [presentation, setPresentation] = useState("");
-    const [material, setMaterial] = useState("");
-    const [mainUse, setMainUse] = useState("");
-    const [certification, setCertification] = useState("");
 
     const credits = user?.credits ?? 0;
 
     const generateOneImage = async (id: number, prompt: string, refImage: string | null) => {
         setImageStates(prev => ({ ...prev, [id]: { status: 'loading', error: undefined } }));
         try {
-            const response = await fetch("/api/generate-image", {
+            const response = await fetch("/api/create-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ prompt, referenceImage: refImage }),
             });
 
             if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || `Error ${response.status}: Failed to generate image`);
+                let errorMsg = `HTTP ${response.status} from /api/create-image`;
+                try {
+                    const errData = await response.json();
+                    if (errData.error) errorMsg += `: ${errData.error}`;
+                } catch (e) { }
+                throw new Error(errorMsg);
             }
 
             const data = await response.json();
@@ -118,6 +166,11 @@ export default function GeneratorPage() {
             return;
         }
 
+        if (referenceImages.length === 0) {
+            setError("Es obligatorio subir una imagen del producto para poder generar visuales de alta calidad.");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -127,18 +180,21 @@ export default function GeneratorPage() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    productName,
+                    productName: skuMaster.product_identity?.product_name,
                     features,
-                    category,
-                    channel,
-                    tone,
-                    type: productType,
-                    brand,
-                    model,
-                    presentation,
-                    material,
-                    mainUse,
-                    certification,
+                    category: skuMaster.product_identity?.category,
+                    channel: skuMaster.marketplace_metadata?.channel,
+                    tone: skuMaster.targeting?.tone,
+                    type: skuMaster.product_identity?.product_type,
+                    brand: skuMaster.product_identity?.brand,
+                    model: skuMaster.product_identity?.product_line,
+                    presentation: skuMaster.product_identity?.presentations?.join(", "),
+                    material: skuMaster.physical_attributes?.material,
+                    mainUse: skuMaster.functional_attributes?.main_use?.join(", "),
+                    benefits: skuMaster.functional_attributes?.benefits_core?.join(", "),
+                    certification: skuMaster.functional_attributes?.certifications?.join(", "),
+                    images: referenceImages,
+                    skuMaster // Send the full master JSON as well
                 }),
             });
 
@@ -158,7 +214,7 @@ export default function GeneratorPage() {
             // Trigger Image Generation in background for each prompt
             if (data.imagePrompts && Array.isArray(data.imagePrompts)) {
                 data.imagePrompts.forEach((item: any) => {
-                    generateOneImage(item.id, item.prompt, referenceImage);
+                    generateOneImage(item.id, item.prompt, referenceImages[0]);
                 });
             }
 
@@ -171,18 +227,22 @@ export default function GeneratorPage() {
         }
     };
 
-    const handleExtract = async (text?: string, image?: string) => {
+    const handleExtract = async (text?: string, images?: string[]) => {
+        if (extracting) return;
         setExtracting(true);
         setError(null);
         try {
             const response = await fetch("/api/extract", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text, image }),
+                body: JSON.stringify({ text, images }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
+                if (response.status === 429) {
+                    throw new Error("🚀 Hemos alcanzado el límite de velocidad de la IA. Por favor, espera unos segundos o completa los datos manualmente si tienes prisa.");
+                }
                 throw new Error(errorData.error || "Error al extraer los datos.");
             }
 
@@ -198,58 +258,96 @@ export default function GeneratorPage() {
     };
 
 
-    // State for the reference image (Base64)
-    const [referenceImage, setReferenceImage] = useState<string | null>(null);
+    // State for the reference images (Base64 array)
+    const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const files = Array.from(e.target.files || []).slice(0, 3); // Max 3 images
+        if (files.length === 0) return;
 
-        // Validar que sea imagen o PDF
-        if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-            setError("Por favor selecciona un archivo de imagen o PDF.");
-            return;
-        }
+        let newImages: string[] = [];
+        let hasError = false;
 
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            let base64 = reader.result as string;
-
-            // Fix for AVIF/HEIC/WEBP: Convert to JPEG/PNG if needed to ensure compatibility
-            // functionality to draw to canvas and export as jpeg
-            if (file.type === 'image/avif' || file.type === 'image/webp' || file.type === 'image/heic') {
-                try {
-                    const img = new Image();
-                    img.src = base64;
-                    await new Promise((resolve) => { img.onload = resolve; });
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx?.drawImage(img, 0, 0);
-                    base64 = canvas.toDataURL('image/jpeg', 0.8); // Convert to JPEG
-                } catch (conversionErr) {
-                    console.error("Error converting image:", conversionErr);
-                    // Fallback to original if conversion fails, but warn
-                }
+        for (const file of files) {
+            if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+                setError("Por favor selecciona archivos de imagen o PDF.");
+                hasError = true;
+                continue;
             }
 
-            setReferenceImage(base64); // Store for generation
-            await handleExtract(undefined, base64);
-        };
-        reader.readAsDataURL(file);
+            const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    const originalResult = reader.result as string;
+
+                    if (file.type.startsWith('image/')) {
+                        try {
+                            const img = new (window.Image || (globalThis as any).Image)();
+                            img.src = originalResult;
+                            await new Promise((res) => { img.onload = res; });
+
+                            const MAX_SIZE = 1200;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                                if (width > MAX_SIZE) {
+                                    height *= MAX_SIZE / width;
+                                    width = MAX_SIZE;
+                                }
+                            } else {
+                                if (height > MAX_SIZE) {
+                                    width *= MAX_SIZE / height;
+                                    height = MAX_SIZE;
+                                }
+                            }
+
+                            const canvas = document.createElement('canvas');
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            // Always convert to JPEG 0.7 to drastically reduce payload size
+                            resolve(canvas.toDataURL('image/jpeg', 0.7));
+                        } catch (conversionErr) {
+                            console.error("Error resizing image:", conversionErr);
+                            resolve(originalResult);
+                        }
+                    } else {
+                        // For non-image files like PDF, keep original base64
+                        resolve(originalResult);
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+            newImages.push(base64);
+        }
+
+        if (newImages.length > 0) {
+            setReferenceImages(prev => {
+                const updated = [...prev, ...newImages].slice(0, 3);
+                // Background extraction with all images
+                handleExtract(undefined, updated).catch(console.error);
+                return updated;
+            });
+        }
     };
 
 
     const handleConfirmExtraction = () => {
         if (extractionData) {
-            if (extractionData.brand) setBrand(extractionData.brand);
-            if (extractionData.model) setModel(extractionData.model);
-            if (extractionData.presentation) setPresentation(extractionData.presentation);
-            if (extractionData.material) setMaterial(extractionData.material);
-            if (extractionData.mainUse) setMainUse(extractionData.mainUse);
-            if (extractionData.certification) setCertification(extractionData.certification);
+            setSkuMaster(prev => ({
+                ...prev,
+                ...extractionData,
+                product_identity: { ...(prev as any).product_identity, ...extractionData.product_identity },
+                physical_attributes: { ...(prev as any).physical_attributes, ...extractionData.physical_attributes },
+                functional_attributes: { ...(prev as any).functional_attributes, ...extractionData.functional_attributes },
+                targeting: { ...(prev as any).targeting, ...extractionData.targeting },
+                brand_style: { ...(prev as MasterSKU).brand_style, ...extractionData.brand_style },
+                seo_geo: { ...(prev as MasterSKU).seo_geo, ...extractionData.seo_geo },
+                marketplace_metadata: { ...(prev as MasterSKU).marketplace_metadata, ...extractionData.marketplace_metadata },
+                ai_constraints: { ...(prev as MasterSKU).ai_constraints, ...extractionData.ai_constraints },
+            } as MasterSKU));
         }
         setShowReviewModal(false);
     };
@@ -270,56 +368,71 @@ export default function GeneratorPage() {
                     </DialogHeader>
 
                     {extractionData && (
-                        <div className="space-y-4 my-4 max-h-[40vh] overflow-y-auto pr-2">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] uppercase font-bold opacity-50">Marca</Label>
-                                    <Input
-                                        value={extractionData.brand || ""}
-                                        onChange={(e) => setExtractionData({ ...extractionData, brand: e.target.value })}
-                                        className="h-8 text-sm"
-                                    />
+                        <div className="space-y-4 my-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1">Identidad de Producto</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] uppercase font-medium opacity-60">Marca</Label>
+                                        <Input
+                                            value={extractionData.product_identity?.brand || ""}
+                                            onChange={(e) => setExtractionData({
+                                                ...extractionData,
+                                                product_identity: { ...extractionData.product_identity!, brand: e.target.value }
+                                            })}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] uppercase font-medium opacity-60">Nombre</Label>
+                                        <Input
+                                            value={extractionData.product_identity?.product_name || ""}
+                                            onChange={(e) => setExtractionData({
+                                                ...extractionData,
+                                                product_identity: { ...extractionData.product_identity!, product_name: e.target.value }
+                                            })}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] uppercase font-bold opacity-50">Modelo</Label>
-                                    <Input
-                                        value={extractionData.model || ""}
-                                        onChange={(e) => setExtractionData({ ...extractionData, model: e.target.value })}
-                                        className="h-8 text-sm"
-                                    />
+
+                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1 pt-2">Atributos Físicos</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] uppercase font-medium opacity-60">Material</Label>
+                                        <Input
+                                            value={extractionData.physical_attributes?.material || ""}
+                                            onChange={(e) => setExtractionData({
+                                                ...extractionData,
+                                                physical_attributes: { ...extractionData.physical_attributes!, material: e.target.value }
+                                            })}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] uppercase font-medium opacity-60">Formato</Label>
+                                        <Input
+                                            value={extractionData.physical_attributes?.format || ""}
+                                            onChange={(e) => setExtractionData({
+                                                ...extractionData,
+                                                physical_attributes: { ...extractionData.physical_attributes!, format: e.target.value }
+                                            })}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[10px] uppercase font-bold opacity-50">Presentación</Label>
-                                <Input
-                                    value={extractionData.presentation || ""}
-                                    onChange={(e) => setExtractionData({ ...extractionData, presentation: e.target.value })}
-                                    className="h-8 text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[10px] uppercase font-bold opacity-50">Material / Ingredientes</Label>
-                                <Input
-                                    value={extractionData.material || ""}
-                                    onChange={(e) => setExtractionData({ ...extractionData, material: e.target.value })}
-                                    className="h-8 text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[10px] uppercase font-bold opacity-50">Uso Principal</Label>
-                                <Input
-                                    value={extractionData.mainUse || ""}
-                                    onChange={(e) => setExtractionData({ ...extractionData, mainUse: e.target.value })}
-                                    className="h-8 text-sm"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-[10px] uppercase font-bold opacity-50">Certificación / Prueba</Label>
-                                <Input
-                                    value={extractionData.certification || ""}
-                                    onChange={(e) => setExtractionData({ ...extractionData, certification: e.target.value })}
-                                    className="h-8 text-sm"
-                                />
+
+                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1 pt-2">Restricciones Visuales (AI)</h4>
+                                <div className="bg-gray-50 p-2 rounded border space-y-2">
+                                    {extractionData.ai_constraints && Object.entries(extractionData.ai_constraints).map(([key, value]) => (
+                                        <div key={key} className="flex items-center justify-between text-[11px]">
+                                            <span className="capitalize">{key.replace(/_/g, ' ')}</span>
+                                            <span className={`font-bold ${value ? 'text-green-600' : 'text-red-500'}`}>
+                                                {value ? 'SÍ' : 'NO'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -345,57 +458,80 @@ export default function GeneratorPage() {
                             </div>
                         </div>
 
-                        {/* SMART EXTRACTION */}
-                        <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 space-y-3">
-                            <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                                <Sparkles className="w-4 h-4" />
-                                <span className="text-sm font-semibold">Smart Extraction (BETA)</span>
-                            </div>
-                            <Textarea
-                                placeholder="Pega aquí un PDF extraído, descripción larga o texto del producto para auto-rellenar..."
-                                className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
-                                id="smart-extract-text"
-                            />
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="flex-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-none gap-2"
-                                    onClick={() => {
-                                        const text = (document.getElementById('smart-extract-text') as HTMLTextAreaElement).value;
-                                        if (text) handleExtract(text);
-                                    }}
-                                    disabled={extracting}
-                                >
-                                    {extracting ? (
-                                        <Sparkles className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                        <FileText className="w-4 h-4" />
-                                    )}
-                                    {extracting ? "Analizando..." : "Extraer de texto"}
-                                </Button>
-                                <div className="relative">
-                                    <input
-                                        type="file"
-                                        id="file-upload"
-                                        className="hidden"
-                                        accept="image/*,application/pdf"
-                                        onChange={handleFileChange}
-                                        disabled={extracting}
-                                    />
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="bg-white dark:bg-gray-900 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-50 gap-2"
-                                        onClick={() => document.getElementById('file-upload')?.click()}
-                                        disabled={extracting}
-                                        type="button"
-                                    >
-                                        <FileText className="w-4 h-4" />
-                                        Subir imagen / PDF
-                                    </Button>
+                        {/* UPLOAD & SMART EXTRACTION */}
+                        <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30 space-y-4">
 
+                            {/* PASO 1: IMAGEN (OBLIGATORIA) */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                                    <Sparkles className="w-4 h-4" />
+                                    <span className="text-sm font-semibold">1. Sube tu imagen (Obligatorio)</span>
                                 </div>
+                                <div className="flex gap-2 w-full items-center">
+                                    <div className="relative w-full">
+                                        <input
+                                            type="file"
+                                            id="file-upload"
+                                            className="hidden"
+                                            accept="image/jpeg,image/png,image/avif,image/webp,image/heic,application/pdf"
+                                            multiple
+                                            onChange={handleFileChange}
+                                            disabled={extracting}
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="default"
+                                            className="w-full bg-white dark:bg-gray-900 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 gap-2 h-12 shadow-sm"
+                                            onClick={() => document.getElementById('file-upload')?.click()}
+                                            disabled={extracting}
+                                            type="button"
+                                        >
+                                            {extracting ? (
+                                                <Sparkles className="w-5 h-5 animate-spin" />
+                                            ) : (
+                                                <FileText className="w-5 h-5" />
+                                            )}
+                                            <span className="font-semibold text-sm">
+                                                {extracting ? "Analizando producto..." : (referenceImages.length > 0 ? "Añadir / Cambiar imágenes" : "Selecciona imágenes de tu producto")}
+                                            </span>
+                                        </Button>
+                                    </div>
+
+                                    {/* IMAGE PREVIEW MODULE */}
+                                    {referenceImages.length > 0 && (
+                                        <div className="flex gap-2 shrink-0 overflow-x-auto max-w-[150px] custom-scrollbar">
+                                            {referenceImages.map((img, i) => (
+                                                <div key={i} className="relative shrink-0 w-12 h-12 rounded-md border border-purple-300 dark:border-purple-600 overflow-hidden shadow-sm">
+                                                    <NextImage src={img} alt={`Preview ${i}`} fill className="object-cover" />
+                                                    {i === 0 && <div className="absolute -top-1 -right-1 bg-green-500 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 shadow-sm" title="Imagen base principal"></div>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30 gap-3 items-start mt-2">
+                                    <AlertCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                                        <p className="font-semibold mb-1">💡 Sube fotos claras de tu producto o sus detalles (ej: empaque original y textura por dentro).</p>
+                                        <p>La primera imagen (#1) será usada como <b>base visual obligatoria</b>, y las demás darán contexto a la IA para aprender mejor la ficha y beneficios técnicos.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* PASO 2: TEXTO EXTRA (OPCIONAL) */}
+                            <div className="space-y-2 pt-2 border-t border-purple-200 dark:border-purple-800/50">
+                                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300 block">2. Ficha técnica (Opcional)</span>
+                                <Textarea
+                                    placeholder="Pega aquí la descripción o ficha técnica del producto para auto-rellenar los campos inferiores..."
+                                    className="bg-white/50 dark:bg-gray-900/50 text-xs h-16"
+                                    id="smart-extract-text"
+                                    value={features}
+                                    onChange={(e) => setFeatures(e.target.value)}
+                                    onBlur={(e) => {
+                                        if (e.target.value) handleExtract(e.target.value);
+                                    }}
+                                />
                             </div>
                         </div>
                     </div>
@@ -404,7 +540,13 @@ export default function GeneratorPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="type">Tipo de producto *</Label>
-                                <Select value={productType} onValueChange={setProductType}>
+                                <Select
+                                    value={skuMaster.product_identity?.product_type || "Belleza & Cuidado Personal"}
+                                    onValueChange={(val) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        product_identity: { ...prev.product_identity!, product_type: val }
+                                    }))}
+                                >
                                     <SelectTrigger id="type">
                                         <SelectValue placeholder="Categoría macro" />
                                     </SelectTrigger>
@@ -427,8 +569,11 @@ export default function GeneratorPage() {
                                     id="category"
                                     placeholder="Ej: Labial, Detergente..."
                                     required
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value)}
+                                    value={skuMaster.product_identity?.category || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        product_identity: { ...prev.product_identity!, category: e.target.value }
+                                    }))}
                                 />
                             </div>
                         </div>
@@ -439,72 +584,137 @@ export default function GeneratorPage() {
                                 id="name"
                                 placeholder="Ej: Jabón de manos antibacterial"
                                 required
-                                value={productName}
-                                onChange={(e) => setProductName(e.target.value)}
+                                value={skuMaster.product_identity?.product_name || ""}
+                                onChange={(e) => setSkuMaster(prev => ({
+                                    ...prev,
+                                    product_identity: { ...prev.product_identity!, product_name: e.target.value }
+                                }))}
                             />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="brand">Marca</Label>
-                                <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Ej: Protex" />
+                                <Input
+                                    id="brand"
+                                    value={skuMaster.product_identity?.brand || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        product_identity: { ...prev.product_identity!, brand: e.target.value }
+                                    }))}
+                                    placeholder="Ej: Protex"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="model">Modelo / Línea</Label>
-                                <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Ej: Aloe Vera" />
+                                <Input
+                                    id="model"
+                                    value={skuMaster.product_identity?.product_line || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        product_identity: { ...prev.product_identity!, product_line: e.target.value }
+                                    }))}
+                                    placeholder="Ej: Aloe Vera"
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="presentation">Presentación</Label>
-                                <Input id="presentation" value={presentation} onChange={(e) => setPresentation(e.target.value)} placeholder="Ej: 500ml, Pack x3" />
+                                <Input
+                                    id="presentation"
+                                    value={skuMaster.product_identity?.presentations?.join(", ") || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        product_identity: { ...prev.product_identity!, presentations: e.target.value.split(",").map(p => p.trim()) }
+                                    }))}
+                                    placeholder="Ej: 500ml, Pack x3"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="material">Material / Ingredientes</Label>
-                                <Input id="material" value={material} onChange={(e) => setMaterial(e.target.value)} placeholder="Ej: Nitrilo, Acero..." />
+                                <Input
+                                    id="material"
+                                    value={skuMaster.physical_attributes?.material || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        physical_attributes: { ...prev.physical_attributes!, material: e.target.value }
+                                    }))}
+                                    placeholder="Ej: Nitrilo, Acero..."
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="mainUse">Uso Principal</Label>
-                                <Input id="mainUse" value={mainUse} onChange={(e) => setMainUse(e.target.value)} placeholder="Ej: Rostro, Industrial..." />
+                                <Input
+                                    id="mainUse"
+                                    value={skuMaster.functional_attributes?.main_use?.join(", ") || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        functional_attributes: { ...prev.functional_attributes!, main_use: e.target.value.split(",").map(u => u.trim()) }
+                                    }))}
+                                    placeholder="Ej: Rostro, Industrial..."
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="certification">Certificación / Garantía</Label>
-                                <Input id="certification" value={certification} onChange={(e) => setCertification(e.target.value)} placeholder="Ej: Cruelty Free, ISO..." />
+                                <Input
+                                    id="certification"
+                                    value={skuMaster.functional_attributes?.certifications?.join(", ") || ""}
+                                    onChange={(e) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        functional_attributes: { ...prev.functional_attributes!, certifications: e.target.value.split(",").map(c => c.trim()) }
+                                    }))}
+                                    placeholder="Ej: Cruelty Free, ISO..."
+                                />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="features">Otras especificaciones / texto libre *</Label>
+                            <Label htmlFor="benefits">Atributos / Beneficios</Label>
                             <Textarea
-                                id="features"
-                                placeholder="Cualquier otro detalle relevante aquí..."
-                                className="h-24 resize-none"
-                                required
-                                value={features}
-                                onChange={(e) => setFeatures(e.target.value)}
+                                id="benefits"
+                                value={skuMaster.functional_attributes?.benefits_core?.join(", ") || ""}
+                                onChange={(e) => setSkuMaster(prev => ({
+                                    ...prev,
+                                    functional_attributes: { ...prev.functional_attributes!, benefits_core: e.target.value.split(",").map(b => b.trim()) }
+                                }))}
+                                placeholder="Ej: Hipoalergénico, Larga duración, 100% natural..."
+                                className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
                             />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="channel">Canal *</Label>
-                                <Select value={channel} onValueChange={setChannel}>
+                                <Select
+                                    value={skuMaster.marketplace_metadata?.channel || "ecommerce"}
+                                    onValueChange={(val) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        marketplace_metadata: { ...prev.marketplace_metadata!, channel: val }
+                                    }))}
+                                >
                                     <SelectTrigger id="channel">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="ecommerce">Tienda online VTEX/Shopify</SelectItem>
-                                        <SelectItem value="marketplace">Marketplace Mercadolibre/Amazon</SelectItem>
+                                        <SelectItem value="marketplace">Mercadolibre/Amazon</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="tone">Tono *</Label>
-                                <Select value={tone} onValueChange={setTone}>
+                                <Select
+                                    value={skuMaster.targeting?.tone || "comercial"}
+                                    onValueChange={(val) => setSkuMaster(prev => ({
+                                        ...prev,
+                                        targeting: { ...prev.targeting!, tone: val }
+                                    }))}
+                                >
                                     <SelectTrigger id="tone">
                                         <SelectValue />
                                     </SelectTrigger>
@@ -603,7 +813,12 @@ export default function GeneratorPage() {
                                                             <div className="relative group w-full h-full">
                                                                 <img src={state.url} alt={img.title} className="w-full h-auto rounded shadow-sm object-cover" />
                                                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                                    <Button size="sm" variant="secondary" onClick={() => window.open(state.url, '_blank')}>
+                                                                    <Button size="sm" variant="secondary" onClick={() => {
+                                                                        const win = window.open();
+                                                                        if (win) {
+                                                                            win.document.write(`<iframe src="${state.url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                                                                        }
+                                                                    }}>
                                                                         Ver
                                                                     </Button>
                                                                     <Button size="sm" variant="secondary" onClick={() => {
@@ -628,7 +843,7 @@ export default function GeneratorPage() {
                                                                 {state.error && (
                                                                     <p className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words leading-tight whitespace-pre-wrap">{state.error}</p>
                                                                 )}
-                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt, referenceImage)}>
+                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt, referenceImages[0])}>
                                                                     Reintentar
                                                                 </Button>
                                                             </div>

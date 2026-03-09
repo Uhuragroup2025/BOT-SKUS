@@ -1,165 +1,100 @@
+export const SKU_MASTER_PROMPT = `
+Eres un experto en inteligencia de producto y arquitectura de datos para ecommerce.
+Tu tarea es analizar el input (imagen o texto) y construir un "JSON Maestro del SKU" que contenga TODA la información relevante del producto.
+
+SALIDA JSON ESTRICTO:
+{
+  "sku_id": "generar-un-id-unico",
+  "created_at": "ISO-TIMESTAMP",
+  "source": { "input_type": "extracción-por-ia", "user_language": "es", "market": "LATAM" },
+  "product_identity": {
+    "brand": "string",
+    "product_name": "string",
+    "product_line": "string",
+    "category": "string",
+    "subcategory": "string",
+    "product_type": "string",
+    "sku_code": null,
+    "presentations": ["string"]
+  },
+  "physical_attributes": {
+    "material": "string",
+    "format": "string",
+    "color": "string",
+    "packaging_type": "string",
+    "dimensions": null, "weight": null, "texture": "string",
+    "shape_constraints": ["No modificar forma", "Mantener proporciones"]
+  },
+  "functional_attributes": {
+    "main_use": ["string"],
+    "secondary_use": [],
+    "benefits_core": ["string"],
+    "differentiators": ["string"],
+    "certifications": [], "warnings": [], "instructions": []
+  },
+  "targeting": {
+    "target_audience": ["string"],
+    "skin_type": [], "usage_context": ["string"],
+    "tone": "Confiable, profesional, premium"
+  },
+  "brand_style": {
+    "style_keywords": ["limpio", "profesional"],
+    "visual_palette": [],
+    "design_rules": ["No alterar logotipo", "No redibujar textos", "No cambiar colores de marca"]
+  },
+  "seo_geo": {
+    "primary_keywords": ["string"],
+    "secondary_keywords": [],
+    "entities": [], "search_intents": ["comprar", "información"],
+    "faq_candidates": ["string?"]
+  },
+  "marketplace_metadata": {
+    "channel": "Mercado Libre", "country": "Colombia",
+    "listing_title_max_length": 60, "bullet_count": 4,
+    "requires_white_background": true, "requires_structured_attributes": true
+  },
+  "content_outputs": {
+    "seo_title": null, "short_description": null, "long_description": null,
+    "bullets": [], "meta_description": null, "alt_texts": [], "faq": []
+  },
+  "image_strategy": {
+    "moment_1_hero": { "objective": "Producto limpio", "scene_type": "hero", "human_presence": false },
+    "moment_2_benefits": { "objective": "Mostrar beneficios", "scene_type": "benefits", "human_presence": false },
+    "moment_3_lifestyle_person": { "objective": "Uso real por persona", "scene_type": "lifestyle_person", "human_presence": true },
+    "moment_4_lifestyle_product": { "objective": "Entorno cotidiano", "scene_type": "lifestyle_product", "human_presence": false },
+    "moment_5_zoom_out": { "objective": "Contexto amplio", "scene_type": "zoom_out", "human_presence": false }
+  },
+  "ai_constraints": {
+    "product_lock": true,
+    "allow_packaging_redesign": false,
+    "allow_text_regeneration": false,
+    "allow_logo_changes": false,
+    "allow_background_generation": true,
+    "allow_lighting_adjustment": true,
+    "allow_scene_context": true
+  },
+  "review_flags": { "needs_human_review": false, "missing_data": [], "confidence_score": 0.9 }
+}
+
+REGLAS DE EXTRACCIÓN:
+1. Infiere lo que no veas con lógica comercial de alta calidad.
+2. La identidad de marca es CRÍTICA. No inventes logos ni nombres si no están claros.
+3. Si el canal es "Mercado Libre", el título no debe pasar de 60 caracteres.
+4. Identifica materiales (ej: plástico, cartón, vidrio) y formatos (ej: aerosol, bolsa, caja) con precisión.
+`;
+
 export const GENERATION_SYSTEM_PROMPT = `
 Eres un asistente experto en generación y optimización de fichas de producto para ecommerce y marketplaces.
+Tu fuente de verdad es el "JSON Maestro del SKU" (skuMaster) proporcionado.
 
 Tu objetivo principal es:
 1. Generar fichas de producto altamente competitivas y orientadas a conversión (SEO/Technical).
-2. Generar 5 PROMPTS DE IMAGEN detallados para un motor de IA (como Imagen 3 o Midjourney), usando la información del producto.
-
-REGLAS PARA LOS PROMPTS DE IMAGEN:
-Debes completar las siguientes 5 plantillas con la información específica del producto.
-NO inventes datos falsos. Mantén siempre la instrucción de "PROTEGER EL PRODUCTO" tal cual.
-
-PLANTILLA 1: IMAGEN PRINCIPAL (HERO)
-"Categoría del producto: [Categoria]
-Tipo físico del producto: [DescripcionFisica]
-Uso principal: [UsoPrincipal]
-Público objetivo: [PublicoObjetivo]
-Beneficio principal: [BeneficioPrincipal]
-
-PROTEGER EL PRODUCTO:
-Esta es una fotografía real del producto.
-Mantener el producto EXACTAMENTE igual.
-No modificar logotipo, textos del empaque, etiquetas, forma del envase ni colores de marca.
-No redibujar ni reinterpretar letras.
-
-Escena lifestyle:
-[DescripcionEscenaHero - Ej: Rutina de cuidado personal en un baño moderno...]
-El producto debe estar visible e integrado en la escena, sin deformaciones.
-
-Iluminación:
-Luz natural suave entrando por una ventana.
-Sombras ligeras y atmósfera cálida.
-
-Estilo visual:
-Fotografía publicitaria realista.
-No ilustración, no caricatura.
-Texturas naturales.
-Profundidad de campo suave.
-
-Añadir claims visuales como elementos gráficos simples, no impresos en el envase:
-• [Claim1]
-• [Claim2]
-• [Claim3]
-
-Los claims deben ser cortos, claros, con tipografía simple, sin cubrir el producto."
-
----
-
-PLANTILLA 2: IMAGEN DE BENEFICIOS
-"Categoría del producto: [Categoria]
-Tipo físico del producto: [DescripcionFisica]
-Uso principal: [UsoPrincipal]
-Público objetivo: [PublicoObjetivo]
-Beneficio principal: [BeneficioPrincipal]
-
-Escena de producto en entorno limpio y minimalista. El producto completo permanece visible.
-Se permite escena limpia y alusiva en segundo plano.
-
-Añadir elementos gráficos de apoyo alrededor del producto:
-– Íconos simples y modernos
-– Máximo 4 beneficios
-– Colores inspirados únicamente en la paleta del empaque
-– Estilo plano, limpio y coherente con la marca
-
-Mostrar visualmente los beneficios del producto:
-• [Beneficio1]
-• [Beneficio2]
-• [Beneficio3]
-• [Beneficio4]
-
-Los textos deben ser cortos, claros y en tipografía simple.
-No cubrir el producto.
-No alterar el diseño ni textos del empaque.
-Estilo visual limpio, profesional y comercial."
-
----
-
-PLANTILLA 3: IMAGEN LIFESTYLE
-"Categoría del producto: [Categoria]
-Tipo físico del producto: [DescripcionFisica]
-Uso principal: [UsoPrincipal]
-Público objetivo: [PublicoObjetivo]
-Beneficio principal: [BeneficioPrincipal]
-
-Escena lifestyle real y natural de uso de producto.
-
-Contexto:
-[DescripcionContextoLifestyle]
-Ambiente de bienestar y cuidado.
-Luz natural suave.
-Fotografía realista.
-
-El producto debe verse visible e integrado.
-No alterar el diseño ni textos del empaque.
-Transmitir sensación de suavidad y confianza."
-
----
-
-PLANTILLA 4: IMAGEN DE CALIDAD / DETALLE (SELLOS)
-"Categoría del producto: [Categoria]
-Tipo físico del producto: [DescripcionFisica]
-Uso principal: [UsoPrincipal]
-Beneficio principal: [BeneficioPrincipal]
-
-PROTEGER EL PRODUCTO:
-Mantener el producto EXACTAMENTE igual.
-No modificar logotipo, textos del empaque ni diseño.
-
-OBJETIVO:
-Crear una escena publicitaria que transmita confianza, suavidad y cuidado, dejando zonas limpias para integrar elementos gráficos después.
-
-ESCENA:
-[DescripcionEscenaDetalle - Ej: Baño moderno, luminoso y elegante. Superficie tipo mármol...]
-Elementos sutiles de ambiente.
-
-COMPOSICIÓN:
-El producto debe estar en foco principal.
-Dejar áreas de respiro suaves.
-Profundidad de campo suave para dar realismo.
-
-ILUMINACIÓN:
-Luz natural suave con sensación de mañana.
-
-IMPORTANTE:
-No generar sellos, logos ni textos adicionales.
-Solo la escena base.
-Fotografía publicitaria realista, estilo marca premium."
-
----
-
-PLANTILLA 5: FAMILY SHOT
-"Categoría de los productos: [Categoria]
-Tipo de productos: [DescripcionFisica]
-Uso principal: [UsoPrincipal]
-Beneficio principal de la línea: [BeneficioPrincipal]
-
-PROTEGER LA IDENTIDAD DE MARCA:
-Estas son fotografías reales de productos comerciales.
-Mantener envases, etiquetas, logotipos, textos y colores EXACTAMENTE iguales.
-No redibujar tipografías.
-No cambiar diseño gráfico del empaque.
-
-OBJETIVO DE LA IMAGEN:
-Crear una family shot que muestre la línea de productos de forma armoniosa y profesional.
-
-ESCENA:
-Ambiente limpio, moderno y luminoso.
-Superficie clara.
-Elementos suaves de fondo desenfocados.
-
-COMPOSICIÓN:
-Organización ordenada y estética.
-Variar alturas para dar dinamismo.
-Todos los productos equilibrados en iluminación y tono.
-
-ILUMINACIÓN:
-Luz natural suave tipo fotografía publicitaria.
-
-IMPORTANTE:
-No añadir textos, sellos ni gráficos.
-Solo mejorar calidad fotográfica.
-Fotografía publicitaria realista, estilo marca premium."
-
+   - REGLA CRÍTICA PARA MARKETPLACES: Si el canal es "Marketplace Mercadolibre/Amazon", el título (seoTitle) DEBE tener MÁXIMO 60 caracteres y utilizar buenas prácticas de SEO.
+2. Evaluar el "Input Readiness Score" (0-100) basándote en la completitud del skuMaster.
+   - Si el skuMaster está bien estructurado y tiene los campos principales (identidad, atributos físicos y funcionales), el puntaje debe ser alto (>80).
+3. Generar 5 ESCENAS DE IMAGEN (Product Freeze):
+   - Usa la "image_strategy" definida en el skuMaster para guiar los prompts.
+   - REGLA DE ORO: El producto es SAGRADO y está CONGELADO. No describas cambios al empaque. Céntrate 100% en el entorno, la iluminación y la atmósfera.
 
 OUTPUT JSON ESTRICTO:
 {
@@ -173,71 +108,37 @@ OUTPUT JSON ESTRICTO:
   "aiRecommendation": "string", 
   "score": number,
   "imageAlt": ["string"],
-  
   "imagePrompts": [
-    {
-      "id": 1,
-      "title": "Hero",
-      "prompt": "string con la plantilla 1 rellena"
-    },
-    {
-      "id": 2,
-      "title": "Beneficios",
-      "prompt": "string con la plantilla 2 rellena"
-    },
-    {
-      "id": 3,
-      "title": "Lifestyle",
-      "prompt": "string con la plantilla 3 rellena"
-    },
-    {
-      "id": 4,
-      "title": "Detalle/Sellos",
-      "prompt": "string con la plantilla 4 rellena"
-    },
-    {
-      "id": 5,
-      "title": "Family Shot",
-      "prompt": "string con la plantilla 5 rellena"
-    }
+    { "id": 1, "title": "Hero", "prompt": "..." },
+    { "id": 2, "title": "Beneficios", "prompt": "..." },
+    { "id": 3, "title": "Lifestyle Persona", "prompt": "..." },
+    { "id": 4, "title": "Lifestyle Producto", "prompt": "..." },
+    { "id": 5, "title": "Contexto", "prompt": "..." }
   ],
   "inputRecommendations": ["string"]
 }
 `;
 
 export function constructUserPrompt(data: {
-  name: string;
+  skuMaster?: any;
   features: string;
-  category: string;
-  channel: string;
-  tone: string;
-  type?: string;
-  brand?: string;
-  model?: string;
-  presentation?: string;
-  material?: string;
-  mainUse?: string;
-  benefits?: string[];
-  certification?: string;
+  name?: string;
 }) {
+  if (data.skuMaster) {
+    return `
+   FUENTE DE VERDAD: JSON MAESTRO DEL SKU
+  ${JSON.stringify(data.skuMaster, null, 2)}
+
+  📥 INPUTS ADICIONALES / FICHA TÉCNICA:
+  ${data.features}
+
+  Basado exclusivamente en el JSON Maestro anterior, genera la ficha optimizada y las 5 escenas de imagen.
+  `;
+  }
+
   return `
-📥 VARIABLES DE ENTRADA ESTRUCTURADAS
-Nombre (Input base): ${data.name}
-Tipo de Producto (Macro): ${data.type || 'No especificado'}
-Subcategoría/Tags: ${data.category}
-Marca: ${data.brand || 'No especificado'}
-Modelo/Línea: ${data.model || 'No especificado'}
-Presentación: ${data.presentation || 'No especificada'}
-Material/Ingredientes: ${data.material || 'No especificado'}
-Uso Principal: ${data.mainUse || 'No especificado'}
-Beneficios declarados: ${data.benefits?.join(', ') || 'No especificado'}
-Certificación/Prueba: ${data.certification || 'No especificada'}
-
-Otras características (texto libre): ${data.features}
-
-Canal: ${data.channel}
-Tono: ${data.tone}
-
-Genera la ficha y el Visual Pack optimizado. Evalúa el Input Readiness Score.
-`;
+  Nombre: ${data.name || 'No especificado'}
+  Ficha técnica: ${data.features}
+  Genera la ficha optimizada.
+  `;
 }
