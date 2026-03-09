@@ -20,6 +20,15 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { MasterSKU } from "@/lib/types";
+import { CATEGORY_TEMPLATES, CategoryKey } from "@/lib/templates";
+
+// Helper to map UI product type to template key
+const getTemplateKey = (productType: string): CategoryKey => {
+    if (productType === "Belleza & Cuidado Personal") return 'personal_care';
+    if (productType === "Alimentos & Bebidas") return 'food';
+    if (productType === "Moda & Accesorios" || productType === "Hogar & Limpieza") return 'textile';
+    return 'general';
+};
 
 // Helper for default state
 const initialSKUMaster: Partial<MasterSKU> = {
@@ -619,72 +628,72 @@ export default function GeneratorPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="presentation">Presentación</Label>
-                                <Input
-                                    id="presentation"
-                                    value={skuMaster.product_identity?.presentations?.join(", ") || ""}
-                                    onChange={(e) => setSkuMaster(prev => ({
-                                        ...prev,
-                                        product_identity: { ...prev.product_identity!, presentations: e.target.value.split(",").map(p => p.trim()) }
-                                    }))}
-                                    placeholder="Ej: 500ml, Pack x3"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="material">Material / Ingredientes</Label>
-                                <Input
-                                    id="material"
-                                    value={skuMaster.physical_attributes?.material || ""}
-                                    onChange={(e) => setSkuMaster(prev => ({
-                                        ...prev,
-                                        physical_attributes: { ...prev.physical_attributes!, material: e.target.value }
-                                    }))}
-                                    placeholder="Ej: Nitrilo, Acero..."
-                                />
+                        <div className="space-y-4 pt-4 border-t border-dashed">
+                            <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                                <FileText className="w-4 h-4" />
+                                Detalles Específicos de {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].name}
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].inputs.map((input) => (
+                                    <div key={input.key} className="space-y-2">
+                                        <Label htmlFor={input.key}>{input.label}</Label>
+                                        {input.type === 'textarea' ? (
+                                            <Textarea
+                                                id={input.key}
+                                                placeholder={input.placeholder}
+                                                value={input.key.split('.').reduce((obj: any, key) => obj?.[key], skuMaster) || ""}
+                                                onChange={(e) => {
+                                                    const keys = input.key.split('.');
+                                                    setSkuMaster(prev => {
+                                                        const newMaster = { ...prev } as any;
+                                                        let current = newMaster;
+                                                        for (let i = 0; i < keys.length - 1; i++) {
+                                                            current[keys[i]] = { ...current[keys[i]] };
+                                                            current = current[keys[i]];
+                                                        }
+                                                        current[keys[keys.length - 1]] = input.type === 'textarea' && input.key.endsWith('core') ? e.target.value.split(',').map(v => v.trim()) : e.target.value;
+                                                        return newMaster;
+                                                    });
+                                                }}
+                                                className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
+                                            />
+                                        ) : (
+                                            <Input
+                                                id={input.key}
+                                                placeholder={input.placeholder}
+                                                value={input.key.split('.').reduce((obj: any, key) => obj?.[key], skuMaster) || ""}
+                                                onChange={(e) => {
+                                                    const keys = input.key.split('.');
+                                                    setSkuMaster(prev => {
+                                                        const newMaster = { ...prev } as any;
+                                                        let current = newMaster;
+                                                        for (let i = 0; i < keys.length - 1; i++) {
+                                                            current[keys[i]] = { ...current[keys[i]] };
+                                                            current = current[keys[i]];
+                                                        }
+                                                        current[keys[keys.length - 1]] = input.key.endsWith('type') && Array.isArray(current[keys[keys.length - 1]]) ? e.target.value.split(',').map(v => v.trim()) : e.target.value;
+                                                        return newMaster;
+                                                    });
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="mainUse">Uso Principal</Label>
-                                <Input
-                                    id="mainUse"
-                                    value={skuMaster.functional_attributes?.main_use?.join(", ") || ""}
-                                    onChange={(e) => setSkuMaster(prev => ({
-                                        ...prev,
-                                        functional_attributes: { ...prev.functional_attributes!, main_use: e.target.value.split(",").map(u => u.trim()) }
-                                    }))}
-                                    placeholder="Ej: Rostro, Industrial..."
-                                />
+                        <div className="space-y-3 pt-4 border-t border-dashed">
+                            <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" />
+                                Momentos Visuales Planeados
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].moments.map((moment) => (
+                                    <div key={moment.id} className="bg-primary/5 border border-primary/20 px-3 py-1 rounded-full text-[10px] uppercase font-bold text-primary">
+                                        {moment.title}
+                                    </div>
+                                ))}
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="certification">Certificación / Garantía</Label>
-                                <Input
-                                    id="certification"
-                                    value={skuMaster.functional_attributes?.certifications?.join(", ") || ""}
-                                    onChange={(e) => setSkuMaster(prev => ({
-                                        ...prev,
-                                        functional_attributes: { ...prev.functional_attributes!, certifications: e.target.value.split(",").map(c => c.trim()) }
-                                    }))}
-                                    placeholder="Ej: Cruelty Free, ISO..."
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="benefits">Atributos / Beneficios</Label>
-                            <Textarea
-                                id="benefits"
-                                value={skuMaster.functional_attributes?.benefits_core?.join(", ") || ""}
-                                onChange={(e) => setSkuMaster(prev => ({
-                                    ...prev,
-                                    functional_attributes: { ...prev.functional_attributes!, benefits_core: e.target.value.split(",").map(b => b.trim()) }
-                                }))}
-                                placeholder="Ej: Hipoalergénico, Larga duración, 100% natural..."
-                                className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
-                            />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

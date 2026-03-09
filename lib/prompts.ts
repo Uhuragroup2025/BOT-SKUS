@@ -76,11 +76,19 @@ SALIDA JSON ESTRICTO:
   "review_flags": { "needs_human_review": false, "missing_data": [], "confidence_score": 0.9 }
 }
 
+REGLAS DE CATEGORÍA Y ESTRATEGIA VISUAL:
+1. Clasifica el producto en una de estas categorías de "product_type": "Belleza & Cuidado Personal", "Alimentos & Bebidas", "Moda & Accesorios", "Hogar & Limpieza", o "Ferretería / Industrial".
+2. Basado en la categoría, define la "image_strategy" con estos 5 momentos exactos:
+   - Si es "Belleza & Cuidado Personal": hero, benefits, lifestyle_person, texture_zoom, dimensions.
+   - Si es "Alimentos & Bebidas": hero, nutrition_table, ingredients, lifestyle_consumption, pack_contents.
+   - Si es "Moda & Accesorios" o "Hogar & Limpieza": hero, dimensions, texture_zoom, lifestyle_room, functionality.
+   - Para otras: hero, benefits, lifestyle_person, lifestyle_product, context.
+
 REGLAS DE EXTRACCIÓN:
 1. Infiere lo que no veas con lógica comercial de alta calidad.
 2. La identidad de marca es CRÍTICA. No inventes logos ni nombres si no están claros.
 3. Si el canal es "Mercado Libre", el título no debe pasar de 60 caracteres.
-4. Identifica materiales (ej: plástico, cartón, vidrio) y formatos (ej: aerosol, bolsa, caja) con precisión.
+4. Identifica materiales y formatos con precisión basada en la categoría (ej: ingredientes para comida, telas para textil).
 `;
 
 export const GENERATION_SYSTEM_PROMPT = `
