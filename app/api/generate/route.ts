@@ -1,11 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
 import { constructUserPrompt, GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
 import { createClient } from "@/lib/supabase/server";
 
-// Initialize Gemini
-// Ensure you have GEMINI_API_KEY in your env variables
+// Initialize AI Providers
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 seconds
@@ -63,39 +64,70 @@ export async function POST(req: Request) {
         }
 
         // 3. Generate Content
-        // Note: Gemini doesn't always strictly adhere to system prompts in the same way as OpenAI in `chat` struct,
-        // but `systemInstruction` is available in newer models or we can prepend it.
-        // For 1.5 Pro, we can pass systemInstruction to getGenerativeModel.
-
-        const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-pro-latest",
-            systemInstruction: GENERATION_SYSTEM_PROMPT,
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
         const userPrompt = constructUserPrompt({
             skuMaster,
             features,
             name: productName
         });
 
-        const promptParts: any[] = [{ text: userPrompt }];
+        let content = "";
 
-        if (images && Array.isArray(images) && images.length > 0) {
-            for (const imgBase64 of images) {
-                if (imgBase64 && imgBase64.startsWith("data:image/")) {
-                    const [meta, base64Data] = imgBase64.split(",");
-                    const mimeType = meta.split(":")[1].split(";")[0];
-                    promptParts.push({
-                        inlineData: { mimeType, data: base64Data }
-                    });
+        if (openai) {
+            console.log("Using OpenAI GPT-4o for generation...");
+            const messages: any[] = [
+                { role: "system", content: GENERATION_SYSTEM_PROMPT },
+            ];
+
+            const userContent: any[] = [
+                { type: "text", text: userPrompt }
+            ];
+
+            if (images && Array.isArray(images) && images.length > 0) {
+                for (const imgBase64 of images) {
+                    if (imgBase64 && imgBase64.startsWith("data:image/")) {
+                        userContent.push({
+                            type: "image_url",
+                            image_url: { url: imgBase64 }
+                        });
+                    }
                 }
             }
-        }
 
-        const result = await model.generateContent(promptParts);
-        const response = await result.response;
-        const content = response.text();
+            messages.push({ role: "user", content: userContent });
+
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages,
+                response_format: { type: "json_object" }
+            });
+
+            content = response.choices[0].message.content || "";
+        } else {
+            console.log("Using Gemini 1.5 Pro for generation...");
+            const model = genAI.getGenerativeModel({
+                model: "gemini-1.5-pro-latest",
+                systemInstruction: GENERATION_SYSTEM_PROMPT,
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const promptParts: any[] = [{ text: userPrompt }];
+
+            if (images && Array.isArray(images) && images.length > 0) {
+                for (const imgBase64 of images) {
+                    if (imgBase64 && imgBase64.startsWith("data:image/")) {
+                        const [meta, base64Data] = imgBase64.split(",");
+                        const mimeType = meta.split(":")[1].split(";")[0];
+                        promptParts.push({
+                            inlineData: { mimeType, data: base64Data }
+                        });
+                    }
+                }
+            }
+
+            const result = await model.generateContent(promptParts);
+            const response = await result.response;
+            content = response.text();
+        }
 
         if (!content) {
             throw new Error("No content generated");
@@ -104,7 +136,6 @@ export async function POST(req: Request) {
         let cleanContent = content.trim();
 
         // 4. Robust JSON Extraction
-        // Sometimes Gemini wraps output in markdown blocks or adds text before/after
         const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             cleanContent = jsonMatch[0];
@@ -118,10 +149,10 @@ export async function POST(req: Request) {
         try {
             parsedContent = JSON.parse(cleanContent.trim());
         } catch (parseError) {
-            console.error("----- RAW GEMINI OUTPUT THAT FAILED TO PARSE -----");
+            console.error("----- RAW AI OUTPUT THAT FAILED TO PARSE -----");
             console.error(content);
             console.error("--------------------------------------------------");
-            throw new Error("Gemini returned invalid JSON format.");
+            throw new Error("AI returned invalid JSON format.");
         }
 
         // 4. Deduct Credit (only for non-team users)
@@ -155,20 +186,8 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error("Error generating content:", error);
-
-        try {
-            // Dynamically import 'fs' and 'path' to avoid bundling issues in edge environments
-            const fs = require('fs');
-            const path = require('path');
-            const logPath = path.join(process.cwd(), 'gemini_error.log');
-            fs.writeFileSync(logPath, `${new Date().toISOString()}\nERROR:\n${error?.message || error}\nSTACK:\n${error?.stack}\n\n`, { flag: 'a' });
-        } catch (e) {
-            // If fs/path are not available (e.g., in Vercel Edge runtime), this catch block will handle it.
-            console.error("Failed to write error to log file:", e);
-        }
-        console.error("Error generating content:", error);
         return NextResponse.json(
-            { error: "Failed to generate content" },
+            { error: "Failed to generate content: " + (error.message || "Unknown error") },
             { status: 500 }
         );
     }
