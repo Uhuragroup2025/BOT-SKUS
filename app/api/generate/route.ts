@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { productName, images } = body;
+        const { productName, features, images, skuMaster } = body;
 
         console.log("Generation Request Received", {
             productName,
