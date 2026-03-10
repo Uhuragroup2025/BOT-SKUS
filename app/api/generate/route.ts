@@ -4,9 +4,8 @@ import { NextResponse } from "next/server";
 import { constructUserPrompt, GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
 import { createClient } from "@/lib/supabase/server";
 
-// Initialize AI Providers
+// Initialize AI Provider base
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 seconds
@@ -23,13 +22,20 @@ export async function POST(req: Request) {
         );
     }
 
+    const openAIKey = process.env.OPENAI_API_KEY;
+    const openai = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
     const isTeamUser = user.email?.endsWith("@uhuragroup.com");
 
     try {
         const body = await req.json();
-        const {
-            productName, features, images, skuMaster
-        } = body;
+        const { productName, images } = body;
+
+        console.log("Generation Request Received", {
+            productName,
+            imagesCount: images?.length || 0,
+            openAIKeyFound: !!openAIKey,
+            openAIKeyLength: openAIKey?.length || 0
+        });
 
         const category = skuMaster?.product_identity?.category || "General";
         const channel = skuMaster?.marketplace_metadata?.channel || "ecommerce";

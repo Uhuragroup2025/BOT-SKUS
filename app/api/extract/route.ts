@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { SKU_MASTER_PROMPT } from "@/lib/prompts";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 seconds
@@ -16,6 +15,9 @@ export async function POST(req: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const openAIKey = process.env.OPENAI_API_KEY;
+    const openai = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
+
     try {
         const body = await req.json();
         const { text, images } = body;
@@ -24,9 +26,9 @@ export async function POST(req: Request) {
         console.log("Extraction Request Received", {
             hasText: !!text,
             imagesCount: images?.length || 0,
-            payloadSizeBytes: payloadSize,
             payloadSizeMB: (payloadSize / 1024 / 1024).toFixed(2) + "MB",
-            usingOpenAI: !!openai
+            openAIKeyFound: !!openAIKey,
+            openAIKeyLength: openAIKey?.length || 0
         });
 
         let extractedText = text;
