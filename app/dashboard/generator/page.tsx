@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, AlertCircle, Copy, Check, FileText } from "lucide-react";
+import { Sparkles, AlertCircle, Copy, Check, FileText, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     Dialog,
@@ -342,6 +342,10 @@ export default function GeneratorPage() {
         }
     };
 
+    const removeImage = (index: number) => {
+        setReferenceImages(prev => prev.filter((_, i) => i !== index));
+    };
+
 
     const handleConfirmExtraction = () => {
         if (extractionData) {
@@ -508,11 +512,19 @@ export default function GeneratorPage() {
 
                                     {/* IMAGE PREVIEW MODULE */}
                                     {referenceImages.length > 0 && (
-                                        <div className="flex gap-2 shrink-0 overflow-x-auto max-w-[150px] custom-scrollbar">
+                                        <div className="flex gap-2 shrink-0 overflow-x-auto max-w-[200px] pb-2 custom-scrollbar">
                                             {referenceImages.map((img, i) => (
-                                                <div key={i} className="relative shrink-0 w-12 h-12 rounded-md border border-purple-300 dark:border-purple-600 overflow-hidden shadow-sm">
+                                                <div key={i} className="relative group shrink-0 w-14 h-14 rounded-md border border-purple-300 dark:border-purple-600 overflow-hidden shadow-sm">
                                                     <NextImage src={img} alt={`Preview ${i}`} fill className="object-cover" />
-                                                    {i === 0 && <div className="absolute -top-1 -right-1 bg-green-500 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 shadow-sm" title="Imagen base principal"></div>}
+                                                    {i === 0 && <div className="absolute -top-1 -right-1 bg-green-500 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 shadow-sm z-10" title="Imagen base principal"></div>}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeImage(i)}
+                                                        className="absolute top-0.5 right-0.5 bg-red-500/80 hover:bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                                                        title="Eliminar imagen"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
