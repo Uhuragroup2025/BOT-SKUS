@@ -87,7 +87,7 @@ export async function POST(req: Request) {
         } else {
             console.log("Using Gemini 1.5 Pro for extraction...");
             const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-pro-latest",
+                model: "gemini-1.5-pro",
                 systemInstruction: SKU_MASTER_PROMPT,
                 generationConfig: { responseMimeType: "application/json" }
             });
