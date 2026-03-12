@@ -3,7 +3,7 @@ import { fal } from "@fal-ai/client";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
     console.log(">>> GENERATE IMAGE API HIT <<<");
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
                 ? referenceImage
                 : `data:image/jpeg;base64,${referenceImage}`;
 
-            result = await fal.subscribe("fal-ai/bria/product-shot", {
+            const briaResult: any = await fal.subscribe("fal-ai/bria/product-shot", {
                 input: {
                     image_url: imageDataUri,
                     background_url: backgroundUrl, // Use the high-end generated background
@@ -89,6 +89,30 @@ export async function POST(req: Request) {
                 } as any,
                 logs: true,
             });
+
+            if (!briaResult.data || !briaResult.data.images || briaResult.data.images.length === 0) {
+                throw new Error("Failed to integrate product with Bria.");
+            }
+
+            const integratedUrl = briaResult.data.images[0].url;
+
+            // Step 3: Creative Refiner / Professional Finish
+            // Skip refiner for white background (should remain pure)
+            if (isWhiteBackground) {
+                result = briaResult;
+            } else {
+                console.log("Step 3: Applying Professional Render Finish with Flux Refiner...");
+                // Light image-to-image pass to unify everything
+                result = await fal.subscribe("fal-ai/flux-pro/v1.1-image-to-image", {
+                    input: {
+                        image_url: integratedUrl,
+                        prompt: `Professional high-end product photography render of ${prompt}, studio lighting, masterwork, highly detailed textures, realistic reflections, 8k resolution, cinematic post-processing.`,
+                        strength: 0.15, // Low strength to maintain product identity but improve integration
+                        guidance_scale: 7.5
+                    } as any,
+                    logs: true,
+                });
+            }
         } else {
             console.log("Using Flux Pro 1.1 for standard generation...");
             result = await fal.subscribe("fal-ai/flux-pro/v1.1", {

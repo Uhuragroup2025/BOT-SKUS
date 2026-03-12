@@ -1,5 +1,9 @@
 "use client";
 
+import { fal } from "@fal-ai/client";
+
+fal.config({ proxyUrl: "/api/fal/proxy" });
+
 import { useState } from "react";
 import NextImage from "next/image";
 import { Button } from "@/components/ui/button";
@@ -188,34 +192,74 @@ export default function GeneratorPage() {
 
     const credits = user?.credits ?? 0;
 
-    const generateOneImage = async (id: number, prompt: string, refImage: string | null) => {
+    const generateOneImage = async (id: number, prompt: string, refImage: string | null, retries = 2) => {
         setImageStates(prev => ({ ...prev, [id]: { status: 'loading', error: undefined } }));
-        try {
-            const response = await fetch("/api/create-image", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, referenceImage: refImage }),
-            });
 
-            if (!response.ok) {
-                let errorMsg = `HTTP ${response.status} from /api/create-image`;
-                try {
-                    const errData = await response.json();
-                    if (errData.error) errorMsg += `: ${errData.error}`;
-                } catch (e) { }
-                throw new Error(errorMsg);
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                if (!refImage) throw new Error("Reference image required.");
+
+                const isWhiteBackground = id === 1 || prompt.toLowerCase().includes("white background") || prompt.toLowerCase().includes("rgb 255,255,255") || prompt.toLowerCase().includes("fondo blanco");
+                let backgroundUrl;
+
+                if (isWhiteBackground) {
+                    backgroundUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
+                } else {
+                    const backgroundPrompt = `${prompt}. Cinematic product photography background, empty scene, premium lighting, 8k resolution, highly detailed, photorealistic, elegant composition. IMPORTANT: No product in the center, leave space for placement. No people, no text.`;
+                    const bgResult = await fal.subscribe("fal-ai/flux-pro/v1.1", {
+                        input: { prompt: backgroundPrompt, aspect_ratio: "16:9" },
+                        logs: true,
+                    });
+                    if (!bgResult.data || !bgResult.data.images || bgResult.data.images.length === 0) throw new Error("Failed background generation.");
+                    backgroundUrl = bgResult.data.images[0].url;
+                }
+
+                const imageDataUri = refImage.startsWith('data:') ? refImage : `data:image/jpeg;base64,${refImage}`;
+
+                const briaResult: any = await fal.subscribe("fal-ai/bria/product-shot", {
+                    input: { image_url: imageDataUri, background_url: backgroundUrl, scene_description: prompt },
+                    logs: true,
+                });
+
+                if (!briaResult.data || !briaResult.data.images || briaResult.data.images.length === 0) throw new Error("Failed product integration.");
+
+                let finalImageUrl = briaResult.data.images[0].url;
+
+                if (!isWhiteBackground) {
+                    const refResult: any = await fal.subscribe("fal-ai/flux-pro/v1.1-image-to-image", {
+                        input: {
+                            image_url: finalImageUrl,
+                            prompt: `Professional high-end product photography render of ${prompt}, studio lighting, masterwork, highly detailed textures, realistic reflections, 8k resolution, cinematic post-processing.`,
+                            strength: 0.15,
+                            guidance_scale: 7.5
+                        },
+                        logs: true,
+                    });
+                    if (refResult.data && refResult.data.images && refResult.data.images.length > 0) {
+                        finalImageUrl = refResult.data.images[0].url;
+                    }
+                }
+
+                setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: finalImageUrl } }));
+                return; // Success, exit the retry loop
+
+            } catch (err: any) {
+                const isAbortError = err.name === 'AbortError' || err.message.includes('aborted');
+                console.error(`Error generating image ${id} (Attempt ${attempt + 1}/${retries + 1}):`, err);
+
+                if (attempt < retries) {
+                    console.log(`Retrying image ${id} in 2 seconds...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } else {
+                    setImageStates(prev => ({
+                        ...prev,
+                        [id]: {
+                            status: 'error',
+                            error: isAbortError ? "La conexión se interrumpió por tiempo de espera. Por favor, reintenta." : err.message
+                        }
+                    }));
+                }
             }
-
-            const data = await response.json();
-            if (data.image) {
-                setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: data.image } }));
-            } else {
-                throw new Error("No image data received");
-            }
-
-        } catch (err: any) {
-            console.error(`Error generating image ${id}:`, err);
-            setImageStates(prev => ({ ...prev, [id]: { status: 'error', error: err.message } }));
         }
     };
 
@@ -276,11 +320,14 @@ export default function GeneratorPage() {
             setResult(data);
             setLoading(false);
 
-            // Trigger Image Generation in background for each prompt
+            // Trigger Image Generation sequentially to avoid AbortError timeouts or rate limits
             if (data.imagePrompts && Array.isArray(data.imagePrompts)) {
-                data.imagePrompts.forEach((item: any) => {
-                    generateOneImage(item.id, item.prompt, referenceImages[0]);
-                });
+                // Run in background but sequentially
+                (async () => {
+                    for (const item of data.imagePrompts) {
+                        await generateOneImage(item.id, item.prompt, referenceImages[0]);
+                    }
+                })();
             }
 
             // Refresh credits in background

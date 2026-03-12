@@ -72,7 +72,12 @@ OBJETIVOS:
    - Calidad de render profesional, alta definición, iluminación de estudio suave.
    - El producto debe ocupar el 85% del cuadro.
    - El prompt DEBE ser explícito: "Professional product photography of [PRODUCT] centered on a pure solid white background (RGB 255,255,255), studio lighting, 8k resolution, highly detailed, realistic texture, no background elements, no lifestyle, pure render style".
-4. Los demás prompts (2-5) deben ser para fondos cinematográficos (Background Plates) que combinen con la categoría.
+4. Los demás prompts (2-5) deben ser para fondos cinematográficos (Background Plates) ultra-realistas.
+   - REGLAS DE ARTE POR CATEGORÍA:
+     * personal_care/beauty: Fondos de baños de lujo, mármol blanco, iluminación suave de mañana, gotas de agua cristalina, minimalismo zen, estilo spa premium.
+     * food_and_beverage: Cocinas modernas de diseño, tablas de madera rústica, ingredientes frescos explotando en color, profundidad de campo (bokeh) pronunciada, iluminación cálida y apetitosa.
+     * home_textile: Habitaciones acogedoras, ventanales con luz natural, plantas decorativas, texturas de lino y algodón visibles, ambientes que transmitan confort y hogar.
+   - El prompt resultante para Flux debe describir la ESCENA VACÍA, dejando espacio para el producto.
 
 FORMATO DE SALIDA (imagePrompts debe seguir los visual_moments del template):
 {
