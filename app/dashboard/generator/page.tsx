@@ -25,63 +25,118 @@ import { CATEGORY_TEMPLATES, CategoryKey } from "@/lib/templates";
 // Helper to map UI product type to template key
 const getTemplateKey = (productType: string): CategoryKey => {
     if (productType === "Belleza & Cuidado Personal") return 'personal_care';
-    if (productType === "Alimentos & Bebidas") return 'food';
-    if (productType === "Moda & Accesorios" || productType === "Hogar & Limpieza") return 'textile';
+    if (productType === "Alimentos & Bebidas") return 'food_and_beverage';
+    if (productType === "Moda & Accesorios" || productType === "Hogar & Limpieza") return 'home_textile';
     return 'general';
 };
 
 // Helper for default state
 const initialSKUMaster: Partial<MasterSKU> = {
+    sku_id: "",
+    source: {
+        input_image_url: "",
+        input_language: "es",
+        marketplace: "mercado_libre",
+        country: "CO"
+    },
+    extraction: {
+        status: 'pending',
+        confidence_score: 0,
+        raw_text_detected: [],
+        normalized_text: "",
+        detected_brand: "",
+        detected_product_name: "",
+        detected_category: "",
+        detected_subcategory: "",
+        detected_variant: "",
+        detected_presentations: [],
+        detected_claims: [],
+        detected_certifications: [],
+        detected_dimensions: [],
+        detected_nutrition_facts: [],
+        detected_ingredients: [],
+        detected_materials: [],
+        detected_usage_context: [],
+        missing_fields: []
+    },
     product_identity: {
         brand: "",
         product_name: "",
-        product_line: "",
+        line: "",
         category: "",
         subcategory: "",
         product_type: "Belleza & Cuidado Personal",
-        sku_code: null,
-        presentations: []
+        variant: "",
+        presentation: "",
+        sku_code: null
     },
     physical_attributes: {
         material: "",
         format: "",
-        color: "",
-        packaging_type: "",
-        dimensions: null,
-        weight: null,
+        shape: "",
         texture: "",
-        shape_constraints: []
+        color_palette: [],
+        packaging_type: "",
+        dimensions: {
+            height_cm: null,
+            width_cm: null,
+            depth_cm: null,
+            diameter_cm: null,
+            weight_g: null,
+            volume_ml: null
+        }
     },
     functional_attributes: {
         main_use: [],
         secondary_use: [],
-        benefits_core: [],
+        main_benefits: [],
         differentiators: [],
-        certifications: [],
-        warnings: [],
-        instructions: []
-    },
-    targeting: {
         target_audience: [],
-        skin_type: [],
-        usage_context: [],
-        tone: "comercial"
+        usage_scenarios: []
     },
-    marketplace_metadata: {
-        channel: "ecommerce",
-        country: "Colombia",
-        listing_title_max_length: 60,
-        bullet_count: 4,
-        requires_white_background: true,
-        requires_structured_attributes: true
+    compliance_attributes: {
+        certifications: [],
+        seals: [],
+        ingredients: [],
+        nutrition_facts: {
+            serving_size: "",
+            calories: "",
+            protein: "",
+            fat: "",
+            carbohydrates: "",
+            sugar: "",
+            sodium: "",
+            other: []
+        },
+        warnings: [],
+        legal_required_elements: []
+    },
+    brand_style: {
+        tone: "comercial",
+        style_keywords: [],
+        visual_palette: [],
+        do_not_modify: ["logo", "packaging_text", "brand_colors", "packaging_shape"]
+    },
+    seo_geo: {
+        primary_keywords: [],
+        secondary_keywords: [],
+        entities: [],
+        search_intents: [],
+        faq_candidates: []
+    },
+    category_template: {
+        template_id: "",
+        template_name: "",
+        template_family: "",
+        required_inputs: [],
+        visual_moments: []
     },
     ai_constraints: {
         product_lock: true,
-        allow_packaging_redesign: false,
-        allow_text_regeneration: false,
-        allow_logo_changes: false,
         allow_background_generation: true,
-        allow_lighting_adjustment: true,
+        allow_packaging_redesign: false,
+        allow_logo_changes: false,
+        allow_text_regeneration: false,
         allow_scene_context: true
     }
 };
@@ -192,16 +247,17 @@ export default function GeneratorPage() {
                     productName: skuMaster.product_identity?.product_name,
                     features,
                     category: skuMaster.product_identity?.category,
-                    channel: skuMaster.marketplace_metadata?.channel,
-                    tone: skuMaster.targeting?.tone,
+                    marketplace: skuMaster.source?.marketplace,
+                    country: skuMaster.source?.country,
+                    tone: skuMaster.brand_style?.tone,
                     type: skuMaster.product_identity?.product_type,
                     brand: skuMaster.product_identity?.brand,
-                    model: skuMaster.product_identity?.product_line,
-                    presentation: skuMaster.product_identity?.presentations?.join(", "),
+                    line: skuMaster.product_identity?.line,
+                    presentation: skuMaster.product_identity?.presentation,
                     material: skuMaster.physical_attributes?.material,
                     mainUse: skuMaster.functional_attributes?.main_use?.join(", "),
-                    benefits: skuMaster.functional_attributes?.benefits_core?.join(", "),
-                    certification: skuMaster.functional_attributes?.certifications?.join(", "),
+                    benefits: skuMaster.functional_attributes?.main_benefits?.join(", "),
+                    certifications: skuMaster.compliance_attributes?.certifications?.join(", "),
                     images: referenceImages,
                     skuMaster // Send the full master JSON as well
                 }),
@@ -295,7 +351,7 @@ export default function GeneratorPage() {
                             img.src = originalResult;
                             await new Promise((res) => { img.onload = res; });
 
-                            const MAX_SIZE = 1200;
+                            const MAX_SIZE = 1024;
                             let width = img.width;
                             let height = img.height;
 
@@ -333,10 +389,13 @@ export default function GeneratorPage() {
         }
 
         if (newImages.length > 0) {
+            const isFirstUpload = referenceImages.length === 0;
             setReferenceImages(prev => {
                 const updated = [...prev, ...newImages].slice(0, 3);
-                // Background extraction with all images
-                handleExtract(undefined, updated).catch(console.error);
+                // Trigger extraction only on the first upload batch
+                if (isFirstUpload) {
+                    handleExtract(undefined, updated).catch(console.error);
+                }
                 return updated;
             });
         }
@@ -355,12 +414,17 @@ export default function GeneratorPage() {
                 product_identity: { ...(prev as any).product_identity, ...extractionData.product_identity },
                 physical_attributes: { ...(prev as any).physical_attributes, ...extractionData.physical_attributes },
                 functional_attributes: { ...(prev as any).functional_attributes, ...extractionData.functional_attributes },
-                targeting: { ...(prev as any).targeting, ...extractionData.targeting },
-                brand_style: { ...(prev as MasterSKU).brand_style, ...extractionData.brand_style },
-                seo_geo: { ...(prev as MasterSKU).seo_geo, ...extractionData.seo_geo },
-                marketplace_metadata: { ...(prev as MasterSKU).marketplace_metadata, ...extractionData.marketplace_metadata },
-                ai_constraints: { ...(prev as MasterSKU).ai_constraints, ...extractionData.ai_constraints },
+                compliance_attributes: { ...(prev as any).compliance_attributes, ...extractionData.compliance_attributes },
+                brand_style: { ...(prev as any).brand_style, ...extractionData.brand_style },
+                seo_geo: { ...(prev as any).seo_geo, ...extractionData.seo_geo },
+                source: { ...(prev as any).source, ...extractionData.source },
+                ai_constraints: { ...(prev as any).ai_constraints, ...extractionData.ai_constraints },
             } as MasterSKU));
+
+            // Populate the technical sheet text area as well
+            if (extractionData.extraction?.normalized_text) {
+                setFeatures(extractionData.extraction.normalized_text);
+            }
         }
         setShowReviewModal(false);
     };
@@ -409,42 +473,32 @@ export default function GeneratorPage() {
                                     </div>
                                 </div>
 
-                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1 pt-2">Atributos Físicos</h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px] uppercase font-medium opacity-60">Material</Label>
-                                        <Input
-                                            value={extractionData.physical_attributes?.material || ""}
-                                            onChange={(e) => setExtractionData({
-                                                ...extractionData,
-                                                physical_attributes: { ...extractionData.physical_attributes!, material: e.target.value }
-                                            })}
-                                            className="h-8 text-sm"
-                                        />
+                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1 pt-2">Extracción Detectada</h4>
+                                <div className="bg-gray-50 dark:bg-gray-900 border rounded p-3 space-y-2 text-xs">
+                                    <div className="flex justify-between border-b pb-1">
+                                        <span className="opacity-60 uppercase font-bold text-[9px]">Categoría</span>
+                                        <span className="font-semibold text-purple-600">{extractionData.extraction?.detected_category || "No detectada"}</span>
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] uppercase font-medium opacity-60">Formato</Label>
-                                        <Input
-                                            value={extractionData.physical_attributes?.format || ""}
-                                            onChange={(e) => setExtractionData({
-                                                ...extractionData,
-                                                physical_attributes: { ...extractionData.physical_attributes!, format: e.target.value }
-                                            })}
-                                            className="h-8 text-sm"
-                                        />
+                                        <span className="opacity-60 uppercase font-bold text-[9px]">Principales Beneficios</span>
+                                        <p className="italic">{extractionData.extraction?.detected_claims?.slice(0, 3).join(", ") || "No detectados"}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="opacity-60 uppercase font-bold text-[9px]">Materiales/Ingredientes</span>
+                                        <p className="italic">{extractionData.extraction?.detected_ingredients?.length ? extractionData.extraction.detected_ingredients.join(", ") : (extractionData.extraction?.detected_materials?.join(", ") || "No detectados")}</p>
                                     </div>
                                 </div>
 
-                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1 pt-2">Restricciones Visuales (AI)</h4>
-                                <div className="bg-gray-50 p-2 rounded border space-y-2">
-                                    {extractionData.ai_constraints && Object.entries(extractionData.ai_constraints).map(([key, value]) => (
-                                        <div key={key} className="flex items-center justify-between text-[11px]">
-                                            <span className="capitalize">{key.replace(/_/g, ' ')}</span>
-                                            <span className={`font-bold ${value ? 'text-green-600' : 'text-red-500'}`}>
-                                                {value ? 'SÍ' : 'NO'}
-                                            </span>
-                                        </div>
-                                    ))}
+                                <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b pb-1 pt-2">Restricciones</h4>
+                                <div className="bg-gray-50 dark:bg-gray-900 border rounded p-2 text-[10px] space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>Product Lock</span>
+                                        <span className="text-green-600 font-bold">Activo</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Scene Context</span>
+                                        <span className="text-green-600 font-bold">Permitido</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -623,19 +677,19 @@ export default function GeneratorPage() {
                                         ...prev,
                                         product_identity: { ...prev.product_identity!, brand: e.target.value }
                                     }))}
-                                    placeholder="Ej: Protex"
+                                    placeholder="Ej: Higietex"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="model">Modelo / Línea</Label>
+                                <Label htmlFor="model">Línea / Variante</Label>
                                 <Input
                                     id="model"
-                                    value={skuMaster.product_identity?.product_line || ""}
+                                    value={skuMaster.product_identity?.line || ""}
                                     onChange={(e) => setSkuMaster(prev => ({
                                         ...prev,
-                                        product_identity: { ...prev.product_identity!, product_line: e.target.value }
+                                        product_identity: { ...prev.product_identity!, line: e.target.value }
                                     }))}
-                                    placeholder="Ej: Aloe Vera"
+                                    placeholder="Ej: Ecológicos"
                                 />
                             </div>
                         </div>
@@ -643,66 +697,92 @@ export default function GeneratorPage() {
                         <div className="space-y-4 pt-4 border-t border-dashed">
                             <h3 className="text-sm font-bold text-primary flex items-center gap-2">
                                 <FileText className="w-4 h-4" />
-                                Detalles Específicos de {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].name}
+                                Framework Visual: {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].template_name}
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].inputs.map((input) => (
-                                    <div key={input.key} className="space-y-2">
-                                        <Label htmlFor={input.key}>{input.label}</Label>
-                                        {input.type === 'textarea' ? (
+                            <div className="grid grid-cols-1 gap-4">
+                                {getTemplateKey(skuMaster.product_identity?.product_type || "") === 'personal_care' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Principales Beneficios (separados por coma)</Label>
                                             <Textarea
-                                                id={input.key}
-                                                placeholder={input.placeholder}
-                                                value={input.key.split('.').reduce((obj: any, key) => obj?.[key], skuMaster) || ""}
-                                                onChange={(e) => {
-                                                    const keys = input.key.split('.');
-                                                    setSkuMaster(prev => {
-                                                        const newMaster = { ...prev } as any;
-                                                        let current = newMaster;
-                                                        for (let i = 0; i < keys.length - 1; i++) {
-                                                            current[keys[i]] = { ...current[keys[i]] };
-                                                            current = current[keys[i]];
-                                                        }
-                                                        current[keys[keys.length - 1]] = input.type === 'textarea' && input.key.endsWith('core') ? e.target.value.split(',').map(v => v.trim()) : e.target.value;
-                                                        return newMaster;
-                                                    });
-                                                }}
-                                                className="bg-white/50 dark:bg-gray-900/50 text-xs h-20"
+                                                placeholder="Ej: Hidratación profunda, Anti-edad..."
+                                                value={skuMaster.functional_attributes?.main_benefits?.join(", ") || ""}
+                                                onChange={(e) => setSkuMaster(prev => ({ ...prev, functional_attributes: { ...prev.functional_attributes!, main_benefits: e.target.value.split(",").map(v => v.trim()) } }))}
+                                                className="h-20 text-xs"
                                             />
-                                        ) : (
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Target / Público</Label>
                                             <Input
-                                                id={input.key}
-                                                placeholder={input.placeholder}
-                                                value={input.key.split('.').reduce((obj: any, key) => obj?.[key], skuMaster) || ""}
-                                                onChange={(e) => {
-                                                    const keys = input.key.split('.');
-                                                    setSkuMaster(prev => {
-                                                        const newMaster = { ...prev } as any;
-                                                        let current = newMaster;
-                                                        for (let i = 0; i < keys.length - 1; i++) {
-                                                            current[keys[i]] = { ...current[keys[i]] };
-                                                            current = current[keys[i]];
-                                                        }
-                                                        current[keys[keys.length - 1]] = input.key.endsWith('type') && Array.isArray(current[keys[keys.length - 1]]) ? e.target.value.split(',').map(v => v.trim()) : e.target.value;
-                                                        return newMaster;
-                                                    });
-                                                }}
+                                                placeholder="Ej: Mujeres 30-40 años..."
+                                                value={skuMaster.functional_attributes?.target_audience?.join(", ") || ""}
+                                                onChange={(e) => setSkuMaster(prev => ({ ...prev, functional_attributes: { ...prev.functional_attributes!, target_audience: e.target.value.split(",").map(v => v.trim()) } }))}
                                             />
-                                        )}
+                                        </div>
                                     </div>
-                                ))}
+                                )}
+                                {getTemplateKey(skuMaster.product_identity?.product_type || "") === 'food_and_beverage' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Ingredientes</Label>
+                                            <Textarea
+                                                placeholder="Ej: Trigo, Azúcar, Vitaminas..."
+                                                value={skuMaster.compliance_attributes?.ingredients?.join(", ") || ""}
+                                                onChange={(e) => setSkuMaster(prev => ({ ...prev, compliance_attributes: { ...prev.compliance_attributes!, ingredients: e.target.value.split(",").map(v => v.trim()) } }))}
+                                                className="h-20 text-xs"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Información Nutricional (Resumen)</Label>
+                                            <Input
+                                                placeholder="Ej: 150 kcal, 0g grasas..."
+                                                value={skuMaster.compliance_attributes?.nutrition_facts?.calories || ""}
+                                                onChange={(e) => setSkuMaster(prev => ({ ...prev, compliance_attributes: { ...prev.compliance_attributes!, nutrition_facts: { ...prev.compliance_attributes!.nutrition_facts, calories: e.target.value } } }))}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                {getTemplateKey(skuMaster.product_identity?.product_type || "") === 'home_textile' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Composición / Material</Label>
+                                            <Input
+                                                placeholder="Ej: 100% Lino..."
+                                                value={skuMaster.physical_attributes?.material || ""}
+                                                onChange={(e) => setSkuMaster(prev => ({ ...prev, physical_attributes: { ...prev.physical_attributes!, material: e.target.value } }))}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Medidas (Alto x Ancho cm)</Label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="Alto"
+                                                    type="number"
+                                                    value={skuMaster.physical_attributes?.dimensions?.height_cm || ""}
+                                                    onChange={(e) => setSkuMaster(prev => ({ ...prev, physical_attributes: { ...prev.physical_attributes!, dimensions: { ...prev.physical_attributes!.dimensions, height_cm: parseInt(e.target.value) || null } } }))}
+                                                />
+                                                <Input
+                                                    placeholder="Ancho"
+                                                    type="number"
+                                                    value={skuMaster.physical_attributes?.dimensions?.width_cm || ""}
+                                                    onChange={(e) => setSkuMaster(prev => ({ ...prev, physical_attributes: { ...prev.physical_attributes!, dimensions: { ...prev.physical_attributes!.dimensions, width_cm: parseInt(e.target.value) || null } } }))}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         <div className="space-y-3 pt-4 border-t border-dashed">
                             <h3 className="text-sm font-bold text-primary flex items-center gap-2">
                                 <Sparkles className="w-4 h-4" />
-                                Momentos Visuales Planeados
+                                Momentos Visuales ({CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].visual_moments.length})
                             </h3>
                             <div className="flex flex-wrap gap-2">
-                                {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].moments.map((moment) => (
-                                    <div key={moment.id} className="bg-primary/5 border border-primary/20 px-3 py-1 rounded-full text-[10px] uppercase font-bold text-primary">
-                                        {moment.title}
+                                {CATEGORY_TEMPLATES[getTemplateKey(skuMaster.product_identity?.product_type || "")].visual_moments.map((momentId) => (
+                                    <div key={momentId} className="bg-primary/5 border border-primary/20 px-3 py-1 rounded-full text-[10px] uppercase font-bold text-primary">
+                                        {momentId.replace(/_/g, ' ')}
                                     </div>
                                 ))}
                             </div>
@@ -710,30 +790,31 @@ export default function GeneratorPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="channel">Canal *</Label>
+                                <Label htmlFor="channel">Marketplace *</Label>
                                 <Select
-                                    value={skuMaster.marketplace_metadata?.channel || "ecommerce"}
+                                    value={skuMaster.source?.marketplace || "mercado_libre"}
                                     onValueChange={(val) => setSkuMaster(prev => ({
                                         ...prev,
-                                        marketplace_metadata: { ...prev.marketplace_metadata!, channel: val }
+                                        source: { ...prev.source!, marketplace: val }
                                     }))}
                                 >
                                     <SelectTrigger id="channel">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="ecommerce">Tienda online VTEX/Shopify</SelectItem>
-                                        <SelectItem value="marketplace">Mercadolibre/Amazon</SelectItem>
+                                        <SelectItem value="mercado_libre">Mercado Libre</SelectItem>
+                                        <SelectItem value="amazon">Amazon</SelectItem>
+                                        <SelectItem value="shopify">Shopify / VTEX</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="tone">Tono *</Label>
                                 <Select
-                                    value={skuMaster.targeting?.tone || "comercial"}
+                                    value={skuMaster.brand_style?.tone || "comercial"}
                                     onValueChange={(val) => setSkuMaster(prev => ({
                                         ...prev,
-                                        targeting: { ...prev.targeting!, tone: val }
+                                        brand_style: { ...prev.brand_style!, tone: val }
                                     }))}
                                 >
                                     <SelectTrigger id="tone">
@@ -742,7 +823,7 @@ export default function GeneratorPage() {
                                     <SelectContent>
                                         <SelectItem value="comercial">Comercial</SelectItem>
                                         <SelectItem value="tecnico">Técnico</SelectItem>
-                                        <SelectItem value="cercano">Cercano</SelectItem>
+                                        <SelectItem value="lujo">Luxury / Premium</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

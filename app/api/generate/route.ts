@@ -38,8 +38,8 @@ export async function POST(req: Request) {
         });
 
         const category = skuMaster?.product_identity?.category || "General";
-        const channel = skuMaster?.marketplace_metadata?.channel || "ecommerce";
-        const tone = skuMaster?.targeting?.tone || "comercial";
+        const marketplace = skuMaster?.source?.marketplace || "mercado_libre";
+        const tone = skuMaster?.brand_style?.tone || "comercial";
 
         if (!productName) {
             return NextResponse.json(
@@ -180,7 +180,7 @@ export async function POST(req: Request) {
                 user_id: user.id,
                 product_name: productName,
                 content: parsedContent,
-                settings: { category, channel, tone },
+                settings: { category, marketplace, tone },
                 score_ia: parsedContent.score || null
             });
 

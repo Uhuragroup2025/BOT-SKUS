@@ -87,26 +87,20 @@ export async function POST(req: Request) {
 
             content = response.choices[0].message.content || "";
         } else {
-            console.log("Using Gemini 1.5 Pro for extraction...");
+            console.log("Using Gemini 1.5 Flash for faster extraction...");
             const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-pro",
+                model: "gemini-1.5-flash",
                 systemInstruction: SKU_MASTER_PROMPT,
                 generationConfig: { responseMimeType: "application/json" }
             });
 
-            let result;
+            const promptParts: any[] = [
+                { text: extractedText || "Analiza esta imagen de producto y extrae toda la información técnica siguiendo el esquema JSON." }
+            ];
 
-            if (extractedText && (!images || images.length === 0)) {
-                result = await model.generateContent(`Extrae datos de este texto: ${extractedText}`);
-            } else if (images && images.length > 0) {
-                const promptParts: any[] = [{ text: "Extrae datos detallados de esta(s) imagen(es) de producto. Si hay varias, intégralas para entender bien el producto frontal y sus posibles detalles/texturas internas." }];
-
-                if (extractedText) {
-                    promptParts.push({ text: `Texto extra de referencia: ${extractedText}` });
-                }
-
+            if (images && Array.isArray(images)) {
                 for (const imgBase64 of images) {
-                    if (imgBase64 && imgBase64.startsWith("data:image/")) {
+                    if (imgBase64 && imgBase64.startsWith("data:")) {
                         const [meta, base64Data] = imgBase64.split(",");
                         const mimeType = meta.split(":")[1].split(";")[0];
                         promptParts.push({
@@ -114,14 +108,20 @@ export async function POST(req: Request) {
                         });
                     }
                 }
-
-                result = await model.generateContent(promptParts);
-            } else {
-                return NextResponse.json({ error: "No input provided" }, { status: 400 });
             }
 
+            const result = await model.generateContent(promptParts);
             const response = await result.response;
-            content = response.text();
+            const jsonText = response.text();
+
+            // Gemini 1.5 Flash might return markdown wrapped JSON
+            if (jsonText.trim().startsWith("```json")) {
+                content = jsonText.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+            } else if (jsonText.trim().startsWith("```")) {
+                content = jsonText.replace(/^```\n?/, "").replace(/\n?```$/, "");
+            } else {
+                content = jsonText;
+            }
         }
 
         console.log("AI Response received. Size:", content.length, "chars");
