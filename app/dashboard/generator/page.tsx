@@ -25,6 +25,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { MasterSKU } from "@/lib/types";
 import { CATEGORY_TEMPLATES, CategoryKey } from "@/lib/templates";
+import { VisualAssetRenderer } from "@/components/VisualAssetRenderer";
 
 // Helper to map UI product type to template key
 const getTemplateKey = (productType: string): CategoryKey => {
@@ -156,10 +157,23 @@ interface GeneratedContent {
     aiRecommendation: string;
     score: number;
     imageAlt: string[];
-    imagePrompts?: {
-        id: number;
-        title: string;
-        prompt: string;
+    visualAssets?: {
+        moment_id?: string;
+        moment_label?: string;
+        api_model?: string;
+        api_params?: any;
+        reference_image_url?: string;
+        prompt?: string;
+        negative_prompt?: string;
+        overlay_text_instructions?: any;
+        composition_notes?: string;
+
+        // Old compat
+        id?: number;
+        type?: 'benefit_infographic' | 'recipe' | 'lifestyle_banner' | 'single_image';
+        title?: string;
+        image_prompt?: string;
+        overlay_data?: any;
     }[];
     visualPack?: { // Mantener compatibilidad si es necesario, pero idealmente deprecado
         id: number;
@@ -188,63 +202,51 @@ export default function GeneratorPage() {
     const [showReviewModal, setShowReviewModal] = useState(false);
 
     // Key: prompt id. Value: base64 string or 'loading' or 'error'.
-    const [imageStates, setImageStates] = useState<Record<number, { status: 'idle' | 'loading' | 'success' | 'error', url?: string, error?: string }>>({});
+    const [imageStates, setImageStates] = useState<Record<string, { status: 'idle' | 'loading' | 'success' | 'error', url?: string, error?: string }>>({});
 
     const credits = user?.credits ?? 0;
 
-    const generateOneImage = async (id: number, prompt: string, refImage: string | null, retries = 2) => {
+    const generateOneImage = async (asset: any, refImage: string | null, retries = 2) => {
+        const id = asset.moment_id || asset.id || Math.random().toString();
         setImageStates(prev => ({ ...prev, [id]: { status: 'loading', error: undefined } }));
 
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
                 if (!refImage) throw new Error("Reference image required.");
 
-                const isWhiteBackground = id === 1 || prompt.toLowerCase().includes("white background") || prompt.toLowerCase().includes("rgb 255,255,255") || prompt.toLowerCase().includes("fondo blanco");
-                let backgroundUrl;
-
-                if (isWhiteBackground) {
-                    backgroundUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
-                } else {
-                    const backgroundPrompt = `${prompt}. Cinematic product photography background, empty scene, premium lighting, 8k resolution, highly detailed, photorealistic, elegant composition. IMPORTANT: No product in the center, leave space for placement. No people, no text.`;
-                    const bgResult = await fal.subscribe("fal-ai/flux-pro/v1.1", {
-                        input: { prompt: backgroundPrompt, aspect_ratio: "16:9" },
-                        logs: true,
-                    });
-                    if (!bgResult.data || !bgResult.data.images || bgResult.data.images.length === 0) throw new Error("Failed background generation.");
-                    backgroundUrl = bgResult.data.images[0].url;
-                }
-
                 const imageDataUri = refImage.startsWith('data:') ? refImage : `data:image/jpeg;base64,${refImage}`;
 
-                const briaResult: any = await fal.subscribe("fal-ai/bria/product-shot", {
-                    input: { image_url: imageDataUri, background_url: backgroundUrl, scene_description: prompt },
+                const apiModel = asset.api_model || "fal-ai/recraft-v3";
+                const prompt = asset.prompt || asset.image_prompt;
+                if (!prompt) throw new Error("Prompt is missing");
+
+                const inputParams: any = {
+                    ...(asset.api_params || {}),
+                    prompt
+                };
+
+                if (asset.negative_prompt) {
+                    inputParams.negative_prompt = asset.negative_prompt;
+                }
+
+                inputParams.image_url = imageDataUri;
+
+                const result: any = await fal.subscribe(apiModel, {
+                    input: inputParams,
                     logs: true,
                 });
 
-                if (!briaResult.data || !briaResult.data.images || briaResult.data.images.length === 0) throw new Error("Failed product integration.");
-
-                let finalImageUrl = briaResult.data.images[0].url;
-
-                if (!isWhiteBackground) {
-                    const refResult: any = await fal.subscribe("fal-ai/flux-pro/v1.1-image-to-image", {
-                        input: {
-                            image_url: finalImageUrl,
-                            prompt: `Professional high-end product photography render of ${prompt}, studio lighting, masterwork, highly detailed textures, realistic reflections, 8k resolution, cinematic post-processing.`,
-                            strength: 0.15,
-                            guidance_scale: 7.5
-                        },
-                        logs: true,
-                    });
-                    if (refResult.data && refResult.data.images && refResult.data.images.length > 0) {
-                        finalImageUrl = refResult.data.images[0].url;
-                    }
+                if (!result.data || !result.data.images || result.data.images.length === 0) {
+                    throw new Error("Failed to generate image.");
                 }
+
+                const finalImageUrl = result.data.images[0].url;
 
                 setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: finalImageUrl } }));
                 return; // Success, exit the retry loop
 
             } catch (err: any) {
-                const isAbortError = err.name === 'AbortError' || err.message.includes('aborted');
+                const isAbortError = err.name === 'AbortError' || err.message?.includes('aborted');
                 console.error(`Error generating image ${id} (Attempt ${attempt + 1}/${retries + 1}):`, err);
 
                 if (attempt < retries) {
@@ -274,8 +276,8 @@ export default function GeneratorPage() {
             return;
         }
 
-        if (referenceImages.length === 0) {
-            setError("Es obligatorio subir una imagen del producto para poder generar visuales de alta calidad.");
+        if (referenceImages.length < 3) {
+            setError("Es obligatorio subir al menos 3 imágenes (empaque y producto) para asegurar buen material a la IA.");
             return;
         }
 
@@ -321,11 +323,11 @@ export default function GeneratorPage() {
             setLoading(false);
 
             // Trigger Image Generation sequentially to avoid AbortError timeouts or rate limits
-            if (data.imagePrompts && Array.isArray(data.imagePrompts)) {
+            if (data.visualAssets && Array.isArray(data.visualAssets)) {
                 // Run in background but sequentially
                 (async () => {
-                    for (const item of data.imagePrompts) {
-                        await generateOneImage(item.id, item.prompt, referenceImages[0]);
+                    for (const item of data.visualAssets) {
+                        await generateOneImage(item, referenceImages[0]);
                     }
                 })();
             }
@@ -374,7 +376,7 @@ export default function GeneratorPage() {
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []).slice(0, 3); // Max 3 images
+        const files = Array.from(e.target.files || []).slice(0, 5); // Max 5 images
         if (files.length === 0) return;
 
         let newImages: string[] = [];
@@ -438,7 +440,7 @@ export default function GeneratorPage() {
         if (newImages.length > 0) {
             const isFirstUpload = referenceImages.length === 0;
             setReferenceImages(prev => {
-                const updated = [...prev, ...newImages].slice(0, 3);
+                const updated = [...prev, ...newImages].slice(0, 5);
                 // Trigger extraction only on the first upload batch
                 if (isFirstUpload) {
                     handleExtract(undefined, updated).catch(console.error);
@@ -579,7 +581,7 @@ export default function GeneratorPage() {
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
                                     <Sparkles className="w-4 h-4" />
-                                    <span className="text-sm font-semibold">1. Sube tu imagen (Obligatorio)</span>
+                                    <span className="text-sm font-semibold">1. Sube tus imágenes (Mín. 3 fotos)</span>
                                 </div>
                                 <div className="flex gap-2 w-full items-center">
                                     <div className="relative w-full">
@@ -606,7 +608,7 @@ export default function GeneratorPage() {
                                                 <FileText className="w-5 h-5" />
                                             )}
                                             <span className="font-semibold text-sm">
-                                                {extracting ? "Analizando producto..." : (referenceImages.length > 0 ? "Añadir / Cambiar imágenes" : "Selecciona imágenes de tu producto")}
+                                                {extracting ? "Analizando producto..." : (referenceImages.length > 0 ? `Añadir más imágenes (${referenceImages.length}/5)` : "Sube mín. 3 imágenes (Empaque y producto)")}
                                             </span>
                                         </Button>
                                     </div>
@@ -636,7 +638,7 @@ export default function GeneratorPage() {
                                     <AlertCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
                                     <div className="text-xs text-blue-700 dark:text-blue-300">
                                         <p className="font-semibold mb-1">💡 Sube fotos claras de tu producto o sus detalles (ej: empaque original y textura por dentro).</p>
-                                        <p>La primera imagen (#1) será usada como <b>base visual obligatoria</b>, y las demás darán contexto a la IA para aprender mejor la ficha y beneficios técnicos.</p>
+                                        <p>La primera imagen (#1) será usada como <b>base visual obligatoria</b>. Necesitamos al menos 3 imágenes (empaque, producto) para que la IA tenga buen material de referencia.</p>
                                     </div>
                                 </div>
                             </div>
@@ -929,70 +931,69 @@ export default function GeneratorPage() {
                         </Card>
 
                         {/* VISUAL PACK / GENERATED IMAGES */}
-                        {result.imagePrompts && (
+                        {result.visualAssets && (
                             <div className="space-y-4">
                                 <h3 className="text-lg font-bold flex items-center gap-2">
                                     <Sparkles className="w-5 h-5 text-primary" />
-                                    Generación de Imágenes (Beta)
+                                    Generación de Imágenes Híbrida
                                 </h3>
                                 <div className="space-y-8">
-                                    {result.imagePrompts.map((img: any) => {
-                                        const state = imageStates[img.id] || { status: 'idle' };
+                                    {result.visualAssets.map((asset: any) => {
+                                        const id = asset.moment_id || asset.id;
+                                        const title = asset.moment_label || asset.title || id;
+                                        const type = asset.api_model || asset.type || 'Custom';
+                                        const prompt = asset.prompt || asset.image_prompt;
+                                        const overlay = asset.overlay_text_instructions || asset.overlay_data;
+
+                                        const state = imageStates[id] || { status: 'idle' };
                                         return (
-                                            <Card key={img.id} className="overflow-hidden border-primary/10">
+                                            <Card key={id} className="overflow-hidden border-primary/10">
                                                 <div className="bg-primary/5 px-4 py-2 border-b border-primary/10 flex justify-between items-center">
-                                                    <span className="font-bold text-sm">Imagen {img.id}: {img.title}</span>
+                                                    <span className="font-bold text-sm">Escena {title}</span>
                                                     <span className="text-[10px] uppercase opacity-70 border px-1 rounded bg-white dark:bg-black">
-                                                        {state.status === 'success' ? 'Generada' : state.status === 'loading' ? 'Creando...' : 'Pendiente'}
+                                                        {state.status === 'success' ? 'Generada' : state.status === 'loading' ? 'Generando...' : 'Pendiente'}
                                                     </span>
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2">
                                                     {/* PROMPT COLUMN */}
                                                     <div className="p-4 border-r border-primary/10 bg-gray-50/50 dark:bg-black/20">
+                                                        <Label className="text-[10px] uppercase font-bold opacity-50 mb-2 block">Modelo AI</Label>
+                                                        <p className="text-xs font-mono mb-4 text-purple-600 dark:text-purple-400">{type}</p>
+
                                                         <Label className="text-[10px] uppercase font-bold opacity-50 mb-2 block">Prompt Generado</Label>
-                                                        <p className="text-xs italic text-muted-foreground whitespace-pre-wrap">{img.prompt}</p>
-                                                        <Button variant="ghost" size="sm" className="mt-2 h-6 text-xs gap-1" onClick={() => navigator.clipboard.writeText(img.prompt)}>
+                                                        <p className="text-xs italic text-muted-foreground whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">{prompt}</p>
+
+                                                        {overlay && (
+                                                            <div className="mt-4 pt-4 border-t border-dashed">
+                                                                <Label className="text-[10px] uppercase font-bold opacity-50 mb-2 block">Datos del Overlay</Label>
+                                                                <pre className="text-[10px] bg-white dark:bg-black p-2 rounded border overflow-x-auto max-h-32 custom-scrollbar">{JSON.stringify(overlay, null, 2)}</pre>
+                                                            </div>
+                                                        )}
+
+                                                        <Button variant="ghost" size="sm" className="mt-2 h-6 text-xs gap-1" onClick={() => navigator.clipboard.writeText(prompt)}>
                                                             <Copy className="w-3 h-3" /> Copiar Prompt
                                                         </Button>
                                                     </div>
 
                                                     {/* IMAGE RESULT COLUMN */}
-                                                    <div className="p-4 flex items-center justify-center min-h-[200px] bg-white dark:bg-black relative">
+                                                    <div className="p-4 flex items-center justify-center min-h-[400px] bg-white dark:bg-black relative">
                                                         {state.status === 'success' && state.url ? (
-                                                            <div className="relative group w-full h-full">
-                                                                <img src={state.url} alt={img.title} className="w-full h-auto rounded shadow-sm object-cover" />
-                                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                                                    <Button size="sm" variant="secondary" onClick={() => {
-                                                                        const win = window.open();
-                                                                        if (win) {
-                                                                            win.document.write(`<iframe src="${state.url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-                                                                        }
-                                                                    }}>
-                                                                        Ver
-                                                                    </Button>
-                                                                    <Button size="sm" variant="secondary" onClick={() => {
-                                                                        const a = document.createElement('a');
-                                                                        a.href = state.url!;
-                                                                        a.download = `imagen-${img.id}-${img.title}.png`;
-                                                                        a.click();
-                                                                    }}>
-                                                                        Descargar
-                                                                    </Button>
-                                                                </div>
+                                                            <div className="relative group w-full h-full flex items-center justify-center">
+                                                                <VisualAssetRenderer asset={{ ...asset, id, title, type, image_prompt: prompt, overlay_data: overlay }} imageUrl={state.url} />
                                                             </div>
                                                         ) : state.status === 'loading' ? (
                                                             <div className="flex flex-col items-center gap-2">
                                                                 <Sparkles className="w-8 h-8 text-primary animate-pulse" />
-                                                                <span className="text-xs text-muted-foreground animate-pulse">Imaginando...</span>
+                                                                <span className="text-xs text-muted-foreground animate-pulse">Generando composición...</span>
                                                             </div>
                                                         ) : state.status === 'error' ? (
                                                             <div className="text-center p-2">
                                                                 <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                                                                <span className="text-xs text-red-500 block font-bold">Error al generar</span>
+                                                                <span className="text-xs text-red-500 block font-bold">Error al generar pantalla</span>
                                                                 {state.error && (
                                                                     <p className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words leading-tight whitespace-pre-wrap">{state.error}</p>
                                                                 )}
-                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(img.id, img.prompt, referenceImages[0])}>
+                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(asset, referenceImages[0])}>
                                                                     Reintentar
                                                                 </Button>
                                                             </div>

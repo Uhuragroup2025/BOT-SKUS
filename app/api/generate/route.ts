@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
-import { constructUserPrompt, GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
+import { constructUserPrompt, GENERATION_SYSTEM_PROMPT, constructImagePrompt, IMAGE_GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
 import { createClient } from "@/lib/supabase/server";
 
 // Initialize AI Provider base
@@ -77,6 +77,12 @@ export async function POST(req: Request) {
         });
 
         let content = "";
+        let imageContent = "";
+
+        const imagePromptRef = constructImagePrompt({
+            skuMaster,
+            features
+        });
 
         if (openai) {
             console.log("Using OpenAI GPT-4o for generation...");
@@ -101,13 +107,25 @@ export async function POST(req: Request) {
 
             messages.push({ role: "user", content: userContent });
 
-            const response = await openai.chat.completions.create({
+            const pSEO = openai.chat.completions.create({
                 model: "gpt-4o",
                 messages,
                 response_format: { type: "json_object" }
             });
 
+            const pImg = openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: IMAGE_GENERATION_SYSTEM_PROMPT },
+                    { role: "user", content: imagePromptRef }
+                ],
+                response_format: { type: "json_object" }
+            });
+
+            const [response, imgResponse] = await Promise.all([pSEO, pImg]);
+
             content = response.choices[0].message.content || "";
+            imageContent = imgResponse.choices[0].message.content || "";
         } else {
             console.log("Using Gemini 1.5 Pro for generation...");
             const model = genAI.getGenerativeModel({
@@ -130,9 +148,19 @@ export async function POST(req: Request) {
                 }
             }
 
-            const result = await model.generateContent(promptParts);
-            const response = await result.response;
-            content = response.text();
+            const imgModel = genAI.getGenerativeModel({
+                model: "gemini-1.5-pro",
+                systemInstruction: IMAGE_GENERATION_SYSTEM_PROMPT,
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const pSEO = model.generateContent(promptParts);
+            const pImg = imgModel.generateContent(imagePromptRef);
+
+            const [resultSEO, resultImg] = await Promise.all([pSEO, pImg]);
+
+            content = (await resultSEO.response).text();
+            imageContent = (await resultImg.response).text();
         }
 
         if (!content) {
@@ -160,6 +188,23 @@ export async function POST(req: Request) {
             console.error("--------------------------------------------------");
             throw new Error("AI returned invalid JSON format.");
         }
+
+        let parsedImageContent: any = {};
+        if (imageContent) {
+            let cleanImg = imageContent.trim();
+            const imgJsonMatch = cleanImg.match(/\{[\s\S]*\}/);
+            if (imgJsonMatch) cleanImg = imgJsonMatch[0];
+            else if (cleanImg.startsWith("\`\`\`json")) cleanImg = cleanImg.replace(/^\`\`\`json\n?/, "").replace(/\n?\`\`\`$/, "");
+            else if (cleanImg.startsWith("\`\`\`")) cleanImg = cleanImg.replace(/^\`\`\`\n?/, "").replace(/\n?\`\`\`$/, "");
+
+            try {
+                parsedImageContent = JSON.parse(cleanImg.trim());
+            } catch (e) {
+                console.error("Failed to parse image prompt JSON:", imageContent);
+            }
+        }
+
+        parsedContent.visualAssets = parsedImageContent.images || [];
 
         // 4. Deduct Credit (only for non-team users)
         if (!isTeamUser) {
