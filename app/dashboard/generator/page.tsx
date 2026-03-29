@@ -1,8 +1,6 @@
 "use client";
 
-import { fal } from "@fal-ai/client";
 
-fal.config({ proxyUrl: "/api/fal/proxy" });
 
 import { useState } from "react";
 import NextImage from "next/image";
@@ -216,31 +214,41 @@ export default function GeneratorPage() {
 
                 const imageDataUri = refImage.startsWith('data:') ? refImage : `data:image/jpeg;base64,${refImage}`;
 
-                const apiModel = asset.api_model || "fal-ai/recraft-v3";
-                const prompt = asset.prompt || asset.image_prompt;
-                if (!prompt) throw new Error("Prompt is missing");
-
-                const inputParams: any = {
-                    ...(asset.api_params || {}),
-                    prompt
-                };
-
-                if (asset.negative_prompt) {
-                    inputParams.negative_prompt = asset.negative_prompt;
+                let apiModel = asset.api_model || asset.api_endpoint || (asset.steps && asset.steps[0] && asset.steps[0].api_endpoint) || (asset.steps && asset.steps[0] && asset.steps[0].tool) || "fal-ai/recraft-v3";
+                if (typeof apiModel === 'string' && apiModel.startsWith("https://fal.run/")) {
+                    apiModel = apiModel.replace("https://fal.run/", "");
                 }
 
-                inputParams.image_url = imageDataUri;
+                if (typeof apiModel === 'string' && (apiModel.toLowerCase().includes("sharp") || apiModel.toLowerCase().includes("canvas"))) {
+                    // Skip AI generation for compose steps we don't support client-side yet
+                    setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: imageDataUri } }));
+                    return;
+                }
 
-                const result: any = await fal.subscribe(apiModel, {
-                    input: inputParams,
-                    logs: true,
+                const workingParams = asset.api_params || (asset.steps && asset.steps[0] && asset.steps[0].api_params) || {};
+
+                const explicitPrompt = asset.prompt || asset.image_prompt;
+                const promptToUse = explicitPrompt || workingParams.prompt;
+                if (!promptToUse) throw new Error("Prompt is missing");
+
+                const response = await fetch("/api/create-image", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        prompt: promptToUse,
+                        referenceImage: imageDataUri
+                    }),
                 });
 
-                if (!result.data || !result.data.images || result.data.images.length === 0) {
-                    throw new Error("Failed to generate image.");
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || "Failed to generate image.");
                 }
 
-                const finalImageUrl = result.data.images[0].url;
+                const data = await response.json();
+                const finalImageUrl = data.image;
 
                 setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: finalImageUrl } }));
                 return; // Success, exit the retry loop
@@ -938,14 +946,31 @@ export default function GeneratorPage() {
                                     Generación de Imágenes Híbrida
                                 </h3>
                                 <div className="space-y-8">
-                                    {result.visualAssets.map((asset: any) => {
-                                        const id = asset.moment_id || asset.id;
+                                    {result.visualAssets.map((asset: any, assetIndex: number) => {
+                                        const id = asset.moment_id || asset.id || `asset-${assetIndex}`;
                                         const title = asset.moment_label || asset.title || id;
-                                        const type = asset.api_model || asset.type || 'Custom';
-                                        const prompt = asset.prompt || asset.image_prompt;
+                                        const type = asset.api_model || (asset.api_endpoint && asset.api_endpoint.split('/').pop()) || (asset.steps && asset.steps[0] && asset.steps[0].api_endpoint && asset.steps[0].api_endpoint.split('/').pop()) || asset.type || 'Custom';
+
+                                        const workingParams = asset.api_params || (asset.steps && asset.steps[0] && asset.steps[0].api_params) || {};
+                                        const explicitPrompt = asset.prompt || asset.image_prompt;
+                                        const prompt = explicitPrompt || workingParams.prompt;
+
                                         const overlay = asset.overlay_text_instructions || asset.overlay_data;
 
                                         const state = imageStates[id] || { status: 'idle' };
+
+                                        // Fallback for placeholder variables
+                                        const finalAsset = { ...asset };
+                                        if (finalAsset.image_prompt) {
+                                            finalAsset.image_prompt = finalAsset.image_prompt.replace(/\{\{product_mask_url\}\}/g, referenceImages[0] || '');
+                                        }
+                                        if (finalAsset.prompt) {
+                                            finalAsset.prompt = finalAsset.prompt.replace(/\{\{product_mask_url\}\}/g, referenceImages[0] || '');
+                                        }
+                                        if (finalAsset.api_params?.prompt) {
+                                            finalAsset.api_params.prompt = finalAsset.api_params.prompt.replace(/\{\{product_mask_url\}\}/g, referenceImages[0] || '');
+                                        }
+
                                         return (
                                             <Card key={id} className="overflow-hidden border-primary/10">
                                                 <div className="bg-primary/5 px-4 py-2 border-b border-primary/10 flex justify-between items-center">

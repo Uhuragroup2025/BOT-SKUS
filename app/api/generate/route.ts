@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
-import { constructUserPrompt, GENERATION_SYSTEM_PROMPT, constructImagePrompt, IMAGE_GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
+import { constructUserPrompt, GENERATION_SYSTEM_PROMPT, constructImageAnalysisPrompt, constructImageMomentPrompt, IMAGE_GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
 import { createClient } from "@/lib/supabase/server";
 
 // Initialize AI Provider base
@@ -77,134 +77,132 @@ export async function POST(req: Request) {
         });
 
         let content = "";
-        let imageContent = "";
+        let visualAssets: any[] = [];
+        let packaging_analysis: any = null;
 
-        const imagePromptRef = constructImagePrompt({
-            skuMaster,
-            features
-        });
+        const extractJSON = (text: string) => {
+            let clean = text.trim();
+            const match = clean.match(/\{[\s\S]*\}/);
+            if (match) clean = match[0];
+            else if (clean.startsWith("```json")) clean = clean.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+            else if (clean.startsWith("```")) clean = clean.replace(/^```\n?/, "").replace(/\n?```$/, "");
+            try { return JSON.parse(clean); } catch(e) { console.error("ExtractJSON failed on:", clean); return null; }
+        };
 
+        const callVisionModel = async (systemPrompt: string, userPrompt: string, imagesPayload: any) => {
+            if (openai) {
+                const userContent: any[] = [{ type: "text", text: userPrompt }];
+                if (imagesPayload && Array.isArray(imagesPayload)) {
+                    for (const imgBase64 of imagesPayload) {
+                        if (imgBase64 && imgBase64.startsWith("data:image/")) {
+                            userContent.push({ type: "image_url", image_url: { url: imgBase64 } });
+                        }
+                    }
+                }
+                const res = await openai.chat.completions.create({
+                    model: "gpt-4o",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userContent }
+                    ],
+                    response_format: { type: "json_object" }
+                });
+                return res.choices[0].message.content || "{}";
+            } else {
+                const imgModel = genAI.getGenerativeModel({
+                    model: "gemini-1.5-pro",
+                    systemInstruction: systemPrompt,
+                    generationConfig: { responseMimeType: "application/json" }
+                });
+                const promptParts: any[] = [{ text: userPrompt }];
+                if (imagesPayload && Array.isArray(imagesPayload)) {
+                    for (const imgBase64 of imagesPayload) {
+                        if (imgBase64 && imgBase64.startsWith("data:image/")) {
+                            const [meta, base64Data] = imgBase64.split(",");
+                            const mimeType = meta.split(":")[1].split(";")[0];
+                            promptParts.push({ inlineData: { mimeType, data: base64Data } });
+                        }
+                    }
+                }
+                const res = await imgModel.generateContent(promptParts);
+                return (await res.response).text();
+            }
+        };
+
+        // 3.1 Start SEO generation
+        let pSEO: Promise<string>;
         if (openai) {
-            console.log("Using OpenAI GPT-4o for generation...");
-            const messages: any[] = [
-                { role: "system", content: GENERATION_SYSTEM_PROMPT },
-            ];
-
-            const userContent: any[] = [
-                { type: "text", text: userPrompt }
-            ];
-
-            if (images && Array.isArray(images) && images.length > 0) {
+            const userContent: any[] = [{ type: "text", text: userPrompt }];
+            if (images && Array.isArray(images)) {
                 for (const imgBase64 of images) {
                     if (imgBase64 && imgBase64.startsWith("data:image/")) {
-                        userContent.push({
-                            type: "image_url",
-                            image_url: { url: imgBase64 }
-                        });
+                        userContent.push({ type: "image_url", image_url: { url: imgBase64 } });
                     }
                 }
             }
-
-            messages.push({ role: "user", content: userContent });
-
-            const pSEO = openai.chat.completions.create({
+            pSEO = openai.chat.completions.create({
                 model: "gpt-4o",
-                messages,
+                messages: [{ role: "system", content: GENERATION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
                 response_format: { type: "json_object" }
-            });
-
-            const pImg = openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: IMAGE_GENERATION_SYSTEM_PROMPT },
-                    { role: "user", content: imagePromptRef }
-                ],
-                response_format: { type: "json_object" }
-            });
-
-            const [response, imgResponse] = await Promise.all([pSEO, pImg]);
-
-            content = response.choices[0].message.content || "";
-            imageContent = imgResponse.choices[0].message.content || "";
+            }).then(r => r.choices[0].message.content || "");
         } else {
-            console.log("Using Gemini 1.5 Pro for generation...");
             const model = genAI.getGenerativeModel({
                 model: "gemini-1.5-pro",
                 systemInstruction: GENERATION_SYSTEM_PROMPT,
                 generationConfig: { responseMimeType: "application/json" }
             });
-
             const promptParts: any[] = [{ text: userPrompt }];
-
-            if (images && Array.isArray(images) && images.length > 0) {
+            if (images && Array.isArray(images)) {
                 for (const imgBase64 of images) {
                     if (imgBase64 && imgBase64.startsWith("data:image/")) {
                         const [meta, base64Data] = imgBase64.split(",");
                         const mimeType = meta.split(":")[1].split(";")[0];
-                        promptParts.push({
-                            inlineData: { mimeType, data: base64Data }
-                        });
+                        promptParts.push({ inlineData: { mimeType, data: base64Data } });
                     }
                 }
             }
-
-            const imgModel = genAI.getGenerativeModel({
-                model: "gemini-1.5-pro",
-                systemInstruction: IMAGE_GENERATION_SYSTEM_PROMPT,
-                generationConfig: { responseMimeType: "application/json" }
-            });
-
-            const pSEO = model.generateContent(promptParts);
-            const pImg = imgModel.generateContent(imagePromptRef);
-
-            const [resultSEO, resultImg] = await Promise.all([pSEO, pImg]);
-
-            content = (await resultSEO.response).text();
-            imageContent = (await resultImg.response).text();
+            pSEO = model.generateContent(promptParts).then(r => r.response.text());
         }
 
-        if (!content) {
-            throw new Error("No content generated");
-        }
-
-        let cleanContent = content.trim();
-
-        // 4. Robust JSON Extraction
-        const jsonMatch = cleanContent.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            cleanContent = jsonMatch[0];
-        } else if (cleanContent.startsWith("```json")) {
-            cleanContent = cleanContent.replace(/^```json\n?/, "").replace(/\n?```$/, "");
-        } else if (cleanContent.startsWith("```")) {
-            cleanContent = cleanContent.replace(/^```\n?/, "").replace(/\n?```$/, "");
-        }
-
-        let parsedContent;
+        // 3.2 Sequential Image Pipeline
         try {
-            parsedContent = JSON.parse(cleanContent.trim());
-        } catch (parseError) {
-            console.error("----- RAW AI OUTPUT THAT FAILED TO PARSE -----");
-            console.error(content);
-            console.error("--------------------------------------------------");
-            throw new Error("AI returned invalid JSON format.");
-        }
+            console.log("Image Pipeline Step 1: Packaging Analysis");
+            const analysisPrompt = constructImageAnalysisPrompt();
+            const analysisRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, analysisPrompt, images);
+            const analysisJson = extractJSON(analysisRaw) || {};
+            packaging_analysis = analysisJson.packaging_analysis || analysisJson;
 
-        let parsedImageContent: any = {};
-        if (imageContent) {
-            let cleanImg = imageContent.trim();
-            const imgJsonMatch = cleanImg.match(/\{[\s\S]*\}/);
-            if (imgJsonMatch) cleanImg = imgJsonMatch[0];
-            else if (cleanImg.startsWith("\`\`\`json")) cleanImg = cleanImg.replace(/^\`\`\`json\n?/, "").replace(/\n?\`\`\`$/, "");
-            else if (cleanImg.startsWith("\`\`\`")) cleanImg = cleanImg.replace(/^\`\`\`\n?/, "").replace(/\n?\`\`\`$/, "");
-
-            try {
-                parsedImageContent = JSON.parse(cleanImg.trim());
-            } catch (e) {
-                console.error("Failed to parse image prompt JSON:", imageContent);
+            if (packaging_analysis) {
+                console.log("Image Pipeline Step 2: Parallel Moments Generation");
+                const moments = ["HERO", "BENEFITS", "LIFESTYLE", "TEXTURE", "PACK"];
+                const momentPromises = moments.map(async (moment_id) => {
+                    const momentPrompt = constructImageMomentPrompt({
+                        skuMaster,
+                        features,
+                        packaging_analysis,
+                        moment_id
+                    });
+                    const momentRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, momentPrompt, images);
+                    return extractJSON(momentRaw);
+                });
+                
+                const momentResults = await Promise.all(momentPromises);
+                visualAssets = momentResults.filter(Boolean);
+            } else {
+                console.error("No packaging analysis returned.", analysisRaw);
             }
+        } catch (imgError) {
+            console.error("Error in sequential image prompts", imgError);
         }
 
-        parsedContent.visualAssets = parsedImageContent.images || [];
+        content = await pSEO;
+        if (!content) throw new Error("No content generated");
+
+        let parsedContent = extractJSON(content);
+        if (!parsedContent) throw new Error("AI returned invalid JSON format.");
+
+        parsedContent.visualAssets = visualAssets;
+        parsedContent.packaging_analysis = packaging_analysis;
 
         // 4. Deduct Credit (only for non-team users)
         if (!isTeamUser) {

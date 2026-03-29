@@ -9,8 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@fal-ai/client": "^1.9.4",
-    "@fal-ai/server-proxy": "^1.2.1",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-avatar": "^1.1.11",
