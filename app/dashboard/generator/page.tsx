@@ -894,7 +894,7 @@ export default function GeneratorPage() {
                             </Alert>
                         )}
 
-                        <Button type="submit" className="w-full gap-2 py-6 text-lg bg-primary hover:bg-primary/90" disabled={loading || credits <= 0}>
+                        <Button type="submit" className="w-full gap-2 py-6 text-lg bg-primary hover:bg-primary/90" disabled={loading || (!user?.email?.endsWith("@uhuragroup.com") && credits <= 0)}>
                             <Sparkles className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
                             {loading ? "Generando visuales y ficha..." : "Generar ficha optimizada"}
                         </Button>
