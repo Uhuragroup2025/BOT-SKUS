@@ -975,7 +975,7 @@ export default function GeneratorPage() {
                         </Card>
 
                         {/* VISUAL PACK / GENERATED IMAGES */}
-                        {result.visualAssets && (
+                        {result.visualAssets && result.visualAssets.length > 0 && (
                             <div className="space-y-4">
                                 <h3 className="text-lg font-bold flex items-center gap-2">
                                     <Sparkles className="w-5 h-5 text-primary" />

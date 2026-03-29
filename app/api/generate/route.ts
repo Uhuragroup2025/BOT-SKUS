@@ -89,7 +89,7 @@ export async function POST(req: Request) {
             try { return JSON.parse(clean); } catch(e) { console.error("ExtractJSON failed on:", clean); return null; }
         };
 
-        const callVisionModel = async (systemPrompt: string, userPrompt: string, imagesPayload: any) => {
+        const callVisionModel = async (systemPrompt: string, userPrompt: string, imagesPayload: any, modelOverride?: string) => {
             if (openai) {
                 const userContent: any[] = [{ type: "text", text: userPrompt }];
                 if (imagesPayload && Array.isArray(imagesPayload)) {
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
                 return res.choices[0].message.content || "{}";
             } else {
                 const imgModel = genAI.getGenerativeModel({
-                    model: "gemini-1.5-pro",
+                    model: modelOverride || "gemini-1.5-pro",
                     systemInstruction: systemPrompt,
                     generationConfig: { responseMimeType: "application/json" }
                 });
@@ -173,17 +173,25 @@ export async function POST(req: Request) {
             packaging_analysis = analysisJson.packaging_analysis || analysisJson;
 
             if (packaging_analysis) {
-                console.log("Image Pipeline Step 2: Parallel Moments Generation");
+                console.log("Image Pipeline Step 2: Parallel Moments Generation with Staggering");
                 const moments = ["HERO", "BENEFITS", "LIFESTYLE", "TEXTURE", "PACK"];
-                const momentPromises = moments.map(async (moment_id) => {
-                    const momentPrompt = constructImageMomentPrompt({
-                        skuMaster,
-                        features,
-                        packaging_analysis,
-                        moment_id
-                    });
-                    const momentRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, momentPrompt, images);
-                    return extractJSON(momentRaw);
+                const momentPromises = moments.map(async (moment_id, idx) => {
+                    // Stagger each request by 1.5 seconds to avoid Gemini 2 RPS rate limit
+                    await new Promise(resolve => setTimeout(resolve, idx * 1500));
+                    try {
+                        const momentPrompt = constructImageMomentPrompt({
+                            skuMaster,
+                            features,
+                            packaging_analysis,
+                            moment_id
+                        });
+                        // Use gemini-1.5-flash for moments for 4x speed as Vercel has 60s timeout
+                        const momentRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, momentPrompt, images, "gemini-1.5-flash");
+                        return extractJSON(momentRaw);
+                    } catch (err) {
+                        console.error(`Error generating moment ${moment_id}:`, err);
+                        return null;
+                    }
                 });
                 
                 const momentResults = await Promise.all(momentPromises);
