@@ -204,8 +204,8 @@ export default function GeneratorPage() {
 
     const credits = user?.credits ?? 0;
 
-    const generateOneImage = async (asset: any, refImage: string | null, retries = 2) => {
-        const id = asset.moment_id || asset.id || Math.random().toString();
+    const generateOneImage = async (asset: any, refImage: string | null, assetIndex: number, retries = 2) => {
+        const id = asset.moment_id || asset.id || `asset-${assetIndex}`;
         setImageStates(prev => ({ ...prev, [id]: { status: 'loading', error: undefined } }));
 
         for (let attempt = 0; attempt <= retries; attempt++) {
@@ -231,11 +231,9 @@ export default function GeneratorPage() {
                 const promptToUse = explicitPrompt || workingParams.prompt;
                 if (!promptToUse) throw new Error("Prompt is missing");
 
-                const response = await fetch("/api/create-image", {
+                let response = await fetch("/api/create-image", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         prompt: promptToUse,
                         referenceImage: imageDataUri
@@ -244,11 +242,49 @@ export default function GeneratorPage() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || "Failed to generate image.");
+                    throw new Error(errorData.error || "Failed to initiate image generation.");
                 }
 
-                const data = await response.json();
-                const finalImageUrl = data.image;
+                const initData = await response.json();
+                
+                if (initData.image) {
+                    setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: initData.image } }));
+                    return;
+                }
+
+                if (!initData.taskId) {
+                    throw new Error("No taskId returned from initial request.");
+                }
+
+                const taskId = initData.taskId;
+                console.log(`Freepik Task Initiated on client: ${taskId}`);
+
+                // Poll every 3 seconds for up to 90 seconds
+                let finalImageUrl = null;
+                for (let polls = 0; polls < 30; polls++) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    const pollResponse = await fetch("/api/create-image", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ taskId })
+                    });
+                    
+                    if (!pollResponse.ok) {
+                        throw new Error("Failed to poll image status");
+                    }
+                    
+                    const pollData = await pollResponse.json();
+                    
+                    if (pollData.status === "completed") {
+                        finalImageUrl = pollData.image;
+                        break;
+                    } else if (pollData.status === "failed") {
+                        throw new Error(pollData.error || "Freepik generation failed.");
+                    }
+                }
+
+                if (!finalImageUrl) throw new Error("Generación agotó el tiempo de espera. Reintenta.");
 
                 setImageStates(prev => ({ ...prev, [id]: { status: 'success', url: finalImageUrl } }));
                 return; // Success, exit the retry loop
@@ -334,8 +370,8 @@ export default function GeneratorPage() {
             if (data.visualAssets && Array.isArray(data.visualAssets)) {
                 // Run in background but sequentially
                 (async () => {
-                    for (const item of data.visualAssets) {
-                        await generateOneImage(item, referenceImages[0]);
+                    for (let i = 0; i < data.visualAssets.length; i++) {
+                        await generateOneImage(data.visualAssets[i], referenceImages[0], i);
                     }
                 })();
             }
@@ -1018,7 +1054,7 @@ export default function GeneratorPage() {
                                                                 {state.error && (
                                                                     <p className="text-[10px] text-red-400 mt-1 max-w-[200px] break-words leading-tight whitespace-pre-wrap">{state.error}</p>
                                                                 )}
-                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(asset, referenceImages[0])}>
+                                                                <Button variant="outline" size="sm" className="mt-2 h-7 text-xs" onClick={() => generateOneImage(asset, referenceImages[0], assetIndex)}>
                                                                     Reintentar
                                                                 </Button>
                                                             </div>
