@@ -225,10 +225,14 @@ export default function GeneratorPage() {
                     return;
                 }
 
-                const workingParams = asset.api_params || (asset.steps && asset.steps[0] && asset.steps[0].api_params) || {};
-
-                const explicitPrompt = asset.prompt || asset.image_prompt;
-                const promptToUse = explicitPrompt || workingParams.prompt;
+                let recursivePrompt = asset.prompt || asset.image_prompt || asset.api_params?.prompt;
+                if (!recursivePrompt && asset.steps) {
+                    for (const s of asset.steps) {
+                        if (s.api_params?.prompt) { recursivePrompt = s.api_params.prompt; break; }
+                        if (s.prompt) { recursivePrompt = s.prompt; break; }
+                    }
+                }
+                const promptToUse = recursivePrompt;
                 if (!promptToUse) throw new Error("Prompt is missing");
 
                 let response = await fetch("/api/create-image", {
@@ -987,9 +991,14 @@ export default function GeneratorPage() {
                                         const title = asset.moment_label || asset.title || id;
                                         const type = asset.api_model || (asset.api_endpoint && asset.api_endpoint.split('/').pop()) || (asset.steps && asset.steps[0] && asset.steps[0].api_endpoint && asset.steps[0].api_endpoint.split('/').pop()) || asset.type || 'Custom';
 
-                                        const workingParams = asset.api_params || (asset.steps && asset.steps[0] && asset.steps[0].api_params) || {};
-                                        const explicitPrompt = asset.prompt || asset.image_prompt;
-                                        const prompt = explicitPrompt || workingParams.prompt;
+                                        let recursivePrompt = asset.prompt || asset.image_prompt || asset.api_params?.prompt;
+                                        if (!recursivePrompt && asset.steps) {
+                                            for (const s of asset.steps) {
+                                                if (s.api_params?.prompt) { recursivePrompt = s.api_params.prompt; break; }
+                                                if (s.prompt) { recursivePrompt = s.prompt; break; }
+                                            }
+                                        }
+                                        const prompt = recursivePrompt;
 
                                         const overlay = asset.overlay_text_instructions || asset.overlay_data;
 

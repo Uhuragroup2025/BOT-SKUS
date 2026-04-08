@@ -187,7 +187,14 @@ export async function POST(req: Request) {
                         });
                         // Use gemini-1.5-flash for moments for 4x speed as Vercel has 60s timeout
                         const momentRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, momentPrompt, images, "gemini-1.5-flash");
-                        return extractJSON(momentRaw);
+                        let json = extractJSON(momentRaw);
+                        if (json && json.visualAssets && Array.isArray(json.visualAssets)) {
+                            return json.visualAssets[0];
+                        }
+                        if (json && Array.isArray(json) && json.length > 0) {
+                            return json[0];
+                        }
+                        return json;
                     } catch (err) {
                         console.error(`Error generating moment ${moment_id}:`, err);
                         return null;
