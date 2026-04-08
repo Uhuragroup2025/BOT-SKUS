@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         };
 
         const callVisionModel = async (systemPrompt: string, userPrompt: string, imagesPayload: any, modelOverride?: string) => {
-            if (openai && !modelOverride?.includes('gemini')) {
+            if (openai && (!modelOverride || modelOverride.includes('gpt'))) {
                 const userContent: any[] = [{ type: "text", text: userPrompt }];
                 if (imagesPayload && Array.isArray(imagesPayload)) {
                     for (const imgBase64 of imagesPayload) {
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
                     }
                 }
                 const res = await openai.chat.completions.create({
-                    model: "gpt-4o",
+                    model: modelOverride && modelOverride.includes('gpt') ? modelOverride : "gpt-4o",
                     messages: [
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userContent }
@@ -185,8 +185,8 @@ export async function POST(req: Request) {
                             packaging_analysis,
                             moment_id
                         });
-                        // Use gemini-1.5-flash for moments for 4x speed as Vercel has 60s timeout
-                        const momentRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, momentPrompt, images, "gemini-1.5-flash");
+                        // Use gpt-4o-mini for moments purely due to the massive TPM limit and fast responses
+                        const momentRaw = await callVisionModel(IMAGE_GENERATION_SYSTEM_PROMPT, momentPrompt, images, "gpt-4o-mini");
                         let json = extractJSON(momentRaw);
                         if (json && json.visualAssets && Array.isArray(json.visualAssets)) {
                             return json.visualAssets[0];
