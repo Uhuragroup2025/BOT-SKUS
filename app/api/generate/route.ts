@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         };
 
         const callVisionModel = async (systemPrompt: string, userPrompt: string, imagesPayload: any, modelOverride?: string) => {
-            if (openai) {
+            if (openai && !modelOverride?.includes('gemini')) {
                 const userContent: any[] = [{ type: "text", text: userPrompt }];
                 if (imagesPayload && Array.isArray(imagesPayload)) {
                     for (const imgBase64 of imagesPayload) {
