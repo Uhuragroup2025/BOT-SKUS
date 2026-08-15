@@ -3,6 +3,9 @@ import { OpenAI } from "openai";
 import { NextResponse } from "next/server";
 import { constructUserPrompt, GENERATION_SYSTEM_PROMPT, constructImageAnalysisPrompt, constructImageMomentPrompt, IMAGE_GENERATION_SYSTEM_PROMPT } from "@/lib/prompts";
 import { createClient } from "@/lib/supabase/server";
+import { createVisualPipelinePlan } from "@/lib/image-pipeline/plan";
+import type { SourceImageRef, VisualPipelinePlan } from "@/lib/image-pipeline/types";
+import type { MasterSKU } from "@/lib/types";
 
 // Initialize AI Provider base
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -29,6 +32,37 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { productName, features, images, skuMaster } = body;
+
+        const sourceImageRefs: SourceImageRef[] = Array.isArray(images)
+            ? images.map((image: unknown, index: number) => {
+                const mimeType = typeof image === "string"
+                    ? image.match(/^data:([^;,]+)[;,]/)?.[1]
+                    : undefined;
+
+                return {
+                    id: `source-${index + 1}`,
+                    index,
+                    ...(mimeType ? { mimeType } : {}),
+                };
+            })
+            : [];
+
+        let visualPipelinePlan: VisualPipelinePlan | null = null;
+        if (skuMaster) {
+            try {
+                visualPipelinePlan = createVisualPipelinePlan({
+                    sku: skuMaster as MasterSKU,
+                    sourceImages: sourceImageRefs,
+                });
+            } catch (error) {
+                console.error(
+                    "Visual Pipeline V1 plan creation failed; continuing with legacy pipeline",
+                    error instanceof Error
+                        ? { name: error.name, message: error.message }
+                        : { name: "UnknownError" },
+                );
+            }
+        }
 
         console.log("Generation Request Received", {
             productName,
@@ -218,6 +252,7 @@ export async function POST(req: Request) {
 
         parsedContent.visualAssets = visualAssets;
         parsedContent.packaging_analysis = packaging_analysis;
+        parsedContent.visualPipelinePlan = visualPipelinePlan;
 
         // 4. Deduct Credit (only for non-team users)
         if (!isTeamUser) {
@@ -256,4 +291,3 @@ export async function POST(req: Request) {
         );
     }
 }
-
